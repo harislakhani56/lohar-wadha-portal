@@ -31,6 +31,9 @@ const STORAGE_KEY = 'lohar_wadha_registrations';
 const ADMIN_PASSWORD = 'admin123';
 
 const App: React.FC = () => {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [inputPassword, setInputPassword] = useState("");
+  const correctPassword = "lohar123";   // apna password yahan change karo
   const [lang, setLang] = useState<Language>('ur');
   const [step, setStep] = useState<'welcome' | 'form' | 'success' | 'admin'>('welcome');
   const [registrations, setRegistrations] = useState<RegistrationData[]>([]);
@@ -314,6 +317,42 @@ const App: React.FC = () => {
 
   const t = content[lang];
   const isRTL = lang === 'ur';
+
+  if (!isLoggedIn) {
+  return (
+    <div style={{ 
+      height: "100vh", 
+      display: "flex", 
+      justifyContent: "center", 
+      alignItems: "center",
+      flexDirection: "column",
+      gap: "10px"
+    }}>
+      <h2>Enter Password to Access</h2>
+
+      <input
+        type="password"
+        placeholder="Enter Password"
+        value={inputPassword}
+        onChange={(e) => setInputPassword(e.target.value)}
+        style={{ padding: "8px" }}
+      />
+
+      <button
+        onClick={() => {
+          if (inputPassword === correctPassword) {
+            setIsLoggedIn(true);
+          } else {
+            alert("Wrong Password");
+          }
+        }}
+        style={{ padding: "8px 15px" }}
+      >
+        Login
+      </button>
+    </div>
+  );
+}
 
   return (
     <div className={`min-h-screen flex flex-col ${isRTL ? 'font-urdu' : 'font-sans'}`} dir={isRTL ? 'rtl' : 'ltr'}>
