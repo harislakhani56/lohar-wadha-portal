@@ -1,12 +1,29 @@
 import React, { useState, useEffect } from "react";
-import { db } from "./firebase";
+
+// ✅ Correct Firebase modular import
+import { initializeApp } from "firebase/app";
 import {
+  getFirestore,
   collection,
   addDoc,
   getDocs,
   deleteDoc,
   doc
 } from "firebase/firestore";
+
+// 🔥 Firebase config (replace with your keys)
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_AUTH_DOMAIN",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_STORAGE_BUCKET",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
 interface Player {
   name: string;
@@ -43,7 +60,7 @@ const App: React.FC = () => {
     timestamp: ""
   });
 
-  // 🔥 FETCH DATA FROM FIREBASE
+  // 🔥 FETCH DATA FROM FIRESTORE
   useEffect(() => {
     const fetchData = async () => {
       const querySnapshot = await getDocs(collection(db, "registrations"));
@@ -90,7 +107,7 @@ const App: React.FC = () => {
     }
   };
 
-  // 🔥 SAVE TO FIREBASE
+  // 🔥 SAVE TO FIRESTORE
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -127,7 +144,7 @@ const App: React.FC = () => {
     }
   };
 
-  // 🔥 DELETE FROM FIREBASE
+  // 🔥 DELETE FROM FIRESTORE
   const deleteRegistration = async (id: string) => {
     await deleteDoc(doc(db, "registrations", id));
     setRegistrations((prev) => prev.filter((r) => r.id !== id));
@@ -216,6 +233,13 @@ const App: React.FC = () => {
               <button onClick={() => deleteRegistration(reg.id!)}>Delete</button>
             </div>
           ))}
+        </div>
+      )}
+
+      {step === "success" && (
+        <div>
+          <h2>Registration Successful!</h2>
+          <button onClick={() => setStep("form")}>Register Another Team</button>
         </div>
       )}
     </div>
