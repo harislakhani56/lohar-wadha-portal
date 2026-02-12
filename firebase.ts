@@ -2,12 +2,13 @@ import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAYdBEIoIiC-HsHIpoKEd4JvTsugBSgz-4",
-  authDomain: "lohar-wadha-cricket.firebaseapp.com",
-  projectId: "lohar-wadha-cricket",
-  storageBucket: "lohar-wadha-cricket.firebasestorage.app",
-  messagingSenderId: "415966561150",
-  appId: "1:415966561150:web:8109570052ab1ded40e92f"
+  apiKey: "AIzaSyA021fiVjzYwjOwffH2II4Mv2JLQfdLajk",
+  authDomain: "lohar-cricket.firebaseapp.com",
+  projectId: "lohar-cricket",
+  storageBucket: "lohar-cricket.firebasestorage.app",
+  messagingSenderId: "349853505322",
+  appId: "1:349853505322:web:cdf67f457daae234ba7053",
+  measurementId: "G-T6RKG20PGE"
 };
 
 const app = initializeApp(firebaseConfig);
