@@ -1,5 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
+import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc } from "firebase/firestore";
+import { db } from "./firebase";
 import { 
   Trophy, 
   Users, 
@@ -61,22 +63,6 @@ const App: React.FC = () => {
     teamType: 'non-jamaati',
     agreedToTerms: false
   });
-
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        setRegistrations(JSON.parse(saved));
-      } catch (e) {
-        console.error("Failed to load registrations", e);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(registrations));
-  }, [registrations]);
-
   const toggleLang = () => setLang(prev => prev === 'en' ? 'ur' : 'en');
 
   const handlePlayerChange = (id: number, name: string) => {
@@ -101,40 +87,62 @@ const App: React.FC = () => {
     setEditingRegId(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const isPlayersComplete = formData.players.every(p => p.name.trim() !== '');
-    const isContactsComplete = 
-      formData.captainName && 
-      formData.captainContact && 
-      formData.viceCaptainName && 
-      formData.viceCaptainContact && 
-      formData.alternativeContact;
+  const fetchRegistrations = async () => {
+  try {
+    const snapshot = await getDocs(collection(db, "registrations"));
+    const data = snapshot.docs.map(docItem => ({
+      regId: docItem.id,
+      ...docItem.data()
+    })) as RegistrationData[];
 
-    if (formData.teamName && isPlayersComplete && isContactsComplete && formData.agreedToTerms) {
+    setRegistrations(data.reverse());
+  } catch (error) {
+    console.error("Error fetching data:", error);
+  }
+};const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+
+  const isPlayersComplete = formData.players.every(p => p.name.trim() !== '');
+  const isContactsComplete =
+    formData.captainName &&
+    formData.captainContact &&
+    formData.viceCaptainName &&
+    formData.viceCaptainContact &&
+    formData.alternativeContact;
+
+  if (formData.teamName && isPlayersComplete && isContactsComplete && formData.agreedToTerms) {
+
+    try {
       if (editingRegId) {
-        setRegistrations(prev => prev.map(reg => 
-          reg.regId === editingRegId 
-            ? { ...reg, ...formData, timestamp: new Date().toISOString() } 
-            : reg
-        ));
-        if (adminAuth) setStep('admin');
-        else setStep('success');
-      } else {
-        const newReg: RegistrationData = {
+        await updateDoc(doc(db, "registrations", editingRegId), {
           ...formData,
-          regId: `LW-${Math.floor(Math.random() * 90000) + 10000}`,
           timestamp: new Date().toISOString()
-        };
-        setRegistrations(prev => [newReg, ...prev]);
-        if (adminAuth && step === 'form') setStep('admin');
-        else setStep('success');
+        });
+      } else {
+        await addDoc(collection(db, "registrations"), {
+          ...formData,
+          timestamp: new Date().toISOString()
+        });
       }
+
+      await fetchRegistrations();
+
+      if (adminAuth) setStep('admin');
+      else setStep('success');
+
       resetForm();
-    } else {
-      alert(lang === 'ur' ? 'براہ کرم تمام معلومات مکمل کریں' : 'Please complete all information');
+
+    } catch (error) {
+      console.error("Error saving data:", error);
+      alert("Error saving data");
     }
-  };
+
+  } else {
+    alert(lang === 'ur'
+      ? 'براہ کرم تمام معلومات مکمل کریں'
+      : 'Please complete all information');
+  }
+};
 
   const handleAdminLogin = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -144,6 +152,7 @@ const App: React.FC = () => {
       setIsLoginModalOpen(false);
       setAdminPasswordInput('');
       setLoginError(false);
+      await fetchRegistrations();
     } else {
       setLoginError(true);
       setTimeout(() => setLoginError(false), 2000);
@@ -201,11 +210,19 @@ const App: React.FC = () => {
     document.body.removeChild(link);
   };
 
-  const deleteRegistration = (id: string) => {
-    if (window.confirm(lang === 'ur' ? 'کیا آپ اس رجسٹریشن کو حذف کرنا چاہتے ہیں؟' : 'Delete this registration?')) {
-      setRegistrations(prev => prev.filter(r => r.regId !== id));
+  const deleteRegistration = async (id: string) => {
+  if (window.confirm(lang === 'ur'
+    ? 'کیا آپ اس رجسٹریشن کو حذف کرنا چاہتے ہیں؟'
+    : 'Delete this registration?')) {
+
+    try {
+      await deleteDoc(doc(db, "registrations", id));
+      await fetchRegistrations();
+    } catch (error) {
+      console.error("Delete error:", error);
     }
-  };
+  }
+};
 
   const handleChatSend = async () => {
     if (!chatInput.trim()) return;
