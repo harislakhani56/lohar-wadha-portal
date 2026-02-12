@@ -29,7 +29,6 @@ import {
 import { Language, RegistrationData, Player, Message } from './types';
 import { getTournamentAssistance } from './geminiService';
 
-const STORAGE_KEY = 'lohar_wadha_registrations';
 const ADMIN_PASSWORD = 'admin123';
 
 const App: React.FC = () => {
@@ -44,6 +43,10 @@ const App: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isThinking, setIsThinking] = useState(false);
   
+  useEffect(() => {
+  fetchRegistrations();
+}, []);
+
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [adminPasswordInput, setAdminPasswordInput] = useState('');
   const [loginError, setLoginError] = useState(false);
@@ -144,20 +147,22 @@ const App: React.FC = () => {
   }
 };
 
-  const handleAdminLogin = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (adminPasswordInput === ADMIN_PASSWORD) {
-      setAdminAuth(true);
-      setStep('admin');
-      setIsLoginModalOpen(false);
-      setAdminPasswordInput('');
-      setLoginError(false);
-      await fetchRegistrations();
-    } else {
-      setLoginError(true);
-      setTimeout(() => setLoginError(false), 2000);
-    }
-  };
+  const handleAdminLogin = async (e?: React.FormEvent) => {
+  if (e) e.preventDefault();
+
+  if (adminPasswordInput === ADMIN_PASSWORD) {
+    setAdminAuth(true);
+    setStep('admin');
+    setIsLoginModalOpen(false);
+    setAdminPasswordInput('');
+    setLoginError(false);
+
+    await fetchRegistrations();   // ab sahi chalega
+  } else {
+    setLoginError(true);
+    setTimeout(() => setLoginError(false), 2000);
+  }
+};
 
   const startEdit = (reg: RegistrationData) => {
     setFormData({
