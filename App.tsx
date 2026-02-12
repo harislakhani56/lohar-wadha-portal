@@ -33,7 +33,7 @@ const ADMIN_PASSWORD = 'admin123';
 const App: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [inputPassword, setInputPassword] = useState("");
-  const correctPassword = "lohar123";   // apna password yahan change karo
+  const correctPassword = "lohar789";   // apna password yahan change karo
   const [lang, setLang] = useState<Language>('ur');
   const [step, setStep] = useState<'welcome' | 'form' | 'success' | 'admin'>('welcome');
   const [registrations, setRegistrations] = useState<RegistrationData[]>([]);
