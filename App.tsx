@@ -121,7 +121,9 @@ const App: React.FC = () => {
           timestamp: new Date().toISOString()
         });
       } else {
+        console.log("About to save:", formData);
         await addDoc(collection(db, "registrations"), {
+        console.log("Saved successfully");
           ...formData,
           timestamp: new Date().toISOString()
         });
