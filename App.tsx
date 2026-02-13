@@ -104,30 +104,51 @@ const App: React.FC = () => {
 };const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
 
-  const isPlayersComplete = formData.players.every(p => p.name.trim() !== '');
+  // 1️⃣ Players check
+  const isPlayersComplete = formData.players.every(
+    p => p.name.trim() !== ''
+  );
+
+  // 2️⃣ Contacts check (trimmed)
   const isContactsComplete =
-    formData.captainName &&
-    formData.captainContact &&
-    formData.viceCaptainName &&
-    formData.viceCaptainContact &&
-    formData.alternativeContact;
+    formData.captainName.trim() &&
+    formData.captainContact.trim() &&
+    formData.viceCaptainName.trim() &&
+    formData.viceCaptainContact.trim() &&
+    formData.alternativeContact.trim();
 
-  if (formData.teamName && isPlayersComplete && isContactsComplete && formData.agreedToTerms) {
+  // 3️⃣ Phone format check
+  const phoneRegex = /^03[0-9]{9}$/;
+  const arePhonesValid =
+    phoneRegex.test(formData.captainContact) &&
+    phoneRegex.test(formData.viceCaptainContact) &&
+    phoneRegex.test(formData.alternativeContact);
 
+  // 4️⃣ Final validation check
+  if (
+    formData.teamName.trim() &&
+    isPlayersComplete &&
+    isContactsComplete &&
+    arePhonesValid &&
+    formData.agreedToTerms
+  ) {
     try {
+
+      console.log("About to save:", formData);
+
       if (editingRegId) {
         await updateDoc(doc(db, "registrations", editingRegId), {
           ...formData,
           timestamp: new Date().toISOString()
         });
       } else {
-        console.log("About to save:", formData);
         await addDoc(collection(db, "registrations"), {
-        console.log("Saved successfully");
           ...formData,
           timestamp: new Date().toISOString()
         });
       }
+
+      console.log("Saved successfully");
 
       await fetchRegistrations();
 
@@ -142,12 +163,13 @@ const App: React.FC = () => {
     }
 
   } else {
-    alert(lang === 'ur'
-      ? 'براہ کرم تمام معلومات مکمل کریں'
-      : 'Please complete all information');
+    alert(
+      lang === 'ur'
+        ? 'براہ کرم تمام معلومات مکمل کریں اور درست نمبر درج کریں'
+        : 'Please complete all fields with valid phone numbers'
+    );
   }
 };
-
   const handleAdminLogin = async (e?: React.FormEvent) => {
   if (e) e.preventDefault();
 
