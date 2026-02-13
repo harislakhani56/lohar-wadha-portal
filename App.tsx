@@ -1,5 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc } from "firebase/firestore";
+import {
+  collection,
+  addDoc,
+  getDocs,
+  updateDoc,
+  deleteDoc,
+  doc,
+  query,
+  where
+} from "firebase/firestore";
 import { db } from "./firebase";
 import { 
   Trophy, 
@@ -125,51 +134,67 @@ const App: React.FC = () => {
     phoneRegex.test(formData.alternativeContact);
 
   // 4️⃣ Final validation check
-  if (
-    formData.teamName.trim() &&
-    isPlayersComplete &&
-    isContactsComplete &&
-    arePhonesValid &&
-    formData.agreedToTerms
-  ) {
-    try {
+if (
+  formData.teamName.trim() &&
+  isPlayersComplete &&
+  isContactsComplete &&
+  arePhonesValid &&
+  formData.agreedToTerms
+) {
+  try {
 
-      console.log("About to save:", formData);
+    console.log("About to save:", formData);
 
-      if (editingRegId) {
-        await updateDoc(doc(db, "registrations", editingRegId), {
-          ...formData,
-          timestamp: new Date().toISOString()
-        });
-      } else {
-        await addDoc(collection(db, "registrations"), {
-          ...formData,
-          timestamp: new Date().toISOString()
-        });
+    if (editingRegId) {
+
+      await updateDoc(doc(db, "registrations", editingRegId), {
+        ...formData,
+        timestamp: new Date().toISOString()
+      });
+
+    } else {
+
+      // ✅ Duplicate team check (only for new registration)
+      const q = query(
+        collection(db, "registrations"),
+        where("teamName", "==", formData.teamName.trim())
+      );
+
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        alert("Team name already registered");
+        return;
       }
 
-      console.log("Saved successfully");
-
-      await fetchRegistrations();
-
-      if (adminAuth) setStep('admin');
-      else setStep('success');
-
-      resetForm();
-
-    } catch (error) {
-      console.error("Error saving data:", error);
-      alert("Error saving data");
+      // ✅ Save if no duplicate found
+      await addDoc(collection(db, "registrations"), {
+        ...formData,
+        timestamp: new Date().toISOString()
+      });
     }
 
-  } else {
-    alert(
-      lang === 'ur'
-        ? 'براہ کرم تمام معلومات مکمل کریں اور درست نمبر درج کریں'
-        : 'Please complete all fields with valid phone numbers'
-    );
+    console.log("Saved successfully");
+
+    await fetchRegistrations();
+
+    if (adminAuth) setStep('admin');
+    else setStep('success');
+
+    resetForm();
+
+  } catch (error) {
+    console.error("Error saving data:", error);
+    alert("Error saving data");
   }
-};
+
+} else {
+  alert(
+    lang === 'ur'
+      ? 'براہ کرم تمام معلومات مکمل کریں اور درست نمبر درج کریں'
+      : 'Please complete all fields with valid phone numbers'
+  );
+}
   const handleAdminLogin = async (e?: React.FormEvent) => {
   if (e) e.preventDefault();
 
@@ -186,7 +211,6 @@ const App: React.FC = () => {
     setTimeout(() => setLoginError(false), 2000);
   }
 };
-
   const startEdit = (reg: RegistrationData) => {
     setFormData({
       teamName: reg.teamName,
