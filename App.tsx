@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { auth } from "./firebase";
+import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
 import {
   collection,
   addDoc,
@@ -53,6 +55,10 @@ const App: React.FC = () => {
   useEffect(() => {
   fetchRegistrations();
 }, []);
+
+  useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, (user) => {
+    if (user) {
       setAdminAuth(true);
     } else {
       setAdminAuth(false);
@@ -117,23 +123,7 @@ const App: React.FC = () => {
   } catch (error) {
     console.error("Error fetching data:", error);
   }
-};
-const handleAdminLogin = async (e: React.FormEvent) => {
-  e.preventDefault();
-
-  if (adminPasswordInput === correctPassword) {
-    setAdminAuth(true);
-    setStep("admin");
-    setAdminPasswordInput("");
-    setLoginError(false);
-    setIsLoginModalOpen(false);
-    await fetchRegistrations();
-  } else {
-    setLoginError(true);
-    setTimeout(() => setLoginError(false), 2000);
-  }
-};
-  const handleSubmit = async (e: React.FormEvent) => {
+};const handleSubmit = async (e: React.FormEvent) => {
   const handleLogin = async (email: string, password: string) => {
   try {
     await signInWithEmailAndPassword(auth, email, password);
