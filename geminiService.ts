@@ -1,7 +1,8 @@
 
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+// Always initialize with process.env.API_KEY as per guidelines.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const getTournamentAssistance = async (prompt: string, history: {role: string, parts: {text: string}[]}[]) => {
   try {
@@ -22,6 +23,7 @@ export const getTournamentAssistance = async (prompt: string, history: {role: st
         Answer in the user's language (Urdu or English). Keep answers professional yet encouraging.`,
       },
     });
+    // Use the .text property directly.
     return response.text;
   } catch (error) {
     console.error("Gemini AI Error:", error);
