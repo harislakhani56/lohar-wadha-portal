@@ -124,6 +124,19 @@ const App: React.FC = () => {
     console.error("Error fetching data:", error);
   }
 };const handleSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (email: string, password: string) => {
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+    alert("Login successful");
+    setStep("admin");
+  } catch (error) {
+    alert("Invalid email or password");
+  }
+};
+  const handleLogout = async () => {
+  await signOut(auth);
+  setStep("home");
+};
   e.preventDefault();
 
   // 1️⃣ Players check
