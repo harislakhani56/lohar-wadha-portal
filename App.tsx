@@ -53,6 +53,15 @@ const App: React.FC = () => {
   useEffect(() => {
   fetchRegistrations();
 }, []);
+      setAdminAuth(true);
+    } else {
+      setAdminAuth(false);
+    }
+  });
+
+  return () => unsubscribe();
+}, []);
+
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [adminPasswordInput, setAdminPasswordInput] = useState('');
   const [loginError, setLoginError] = useState(false);
@@ -125,12 +134,17 @@ const handleAdminLogin = async (e: React.FormEvent) => {
   }
 };
   const handleSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (email: string, password: string) => {
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
     alert("Login successful");
     setStep("admin");
   } catch (error) {
     alert("Invalid email or password");
   }
 };
+  const handleLogout = async () => {
+  await signOut(auth);
   setStep("home");
 };
   e.preventDefault();
