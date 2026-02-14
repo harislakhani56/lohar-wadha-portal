@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { auth } from "./firebase";
-import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
 import {
   collection,
   addDoc,
@@ -51,23 +49,24 @@ const App: React.FC = () => {
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isThinking, setIsThinking] = useState(false);
-  
+  const handleAdminLogin = (e: React.FormEvent) => {
+  e.preventDefault();
+
+  if (adminPasswordInput === correctPassword) {
+    setAdminAuth(true);
+    setStep('admin');
+    setIsLoginModalOpen(false);
+    setAdminPasswordInput('');
+    setLoginError(false);
+  } else {
+    setLoginError(true);
+    setTimeout(() => setLoginError(false), 2000);
+  }
+};
   useEffect(() => {
   fetchRegistrations();
 }, []);
-
-  useEffect(() => {
-  const unsubscribe = onAuthStateChanged(auth, (user) => {
-    if (user) {
-      setAdminAuth(true);
-    } else {
-      setAdminAuth(false);
-    }
-  });
-
-  return () => unsubscribe();
-}, []);
-
+  
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [adminPasswordInput, setAdminPasswordInput] = useState('');
   const [loginError, setLoginError] = useState(false);
@@ -124,22 +123,8 @@ const App: React.FC = () => {
     console.error("Error fetching data:", error);
   }
 };const handleSubmit = async (e: React.FormEvent) => {
-  const handleLogin = async (email: string, password: string) => {
-  try {
-    await signInWithEmailAndPassword(auth, email, password);
-    alert("Login successful");
-    setStep("admin");
-  } catch (error) {
-    alert("Invalid email or password");
-  }
-};
-  const handleLogout = async () => {
-  await signOut(auth);
-  setStep("home");
-};
-  e.preventDefault();
-
-  // 1️⃣ Players check
+  
+    // 1️⃣ Players check
   const isPlayersComplete = formData.players.every(
     p => p.name.trim() !== ''
   );
@@ -221,7 +206,6 @@ if (
       : 'Please complete all fields with valid phone numbers'
   );
 }
-  if (adminPasswordInput === ADMIN_PASSWORD) {
     setAdminAuth(true);
     setStep('admin');
     setIsLoginModalOpen(false);
