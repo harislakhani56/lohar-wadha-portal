@@ -20,6 +20,49 @@
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
+
+        /* High-Fidelity Print Styles for Screenshot/Save functionality */
+        @media print {
+            body {
+                background: white !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            nav, footer, button, .no-print, #chat-bot-container {
+                display: none !important;
+            }
+            #root {
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            main {
+                padding: 0 !important;
+                margin: 0 !important;
+                width: 100% !important;
+                max-width: none !important;
+            }
+            /* Isolate the ticket for a clean save */
+            #printable-ticket {
+                visibility: visible !important;
+                position: fixed !important;
+                left: 50% !important;
+                top: 50% !important;
+                transform: translate(-50%, -50%) scale(1.2) !important;
+                width: 500px !important;
+                margin: 0 !important;
+                box-shadow: none !important;
+                border: none !important;
+            }
+            /* Hide everything else during print */
+            body > *:not(#root), #root > *:not(main), main > *:not(#printable-ticket-wrapper) {
+                display: none !important;
+            }
+            #printable-ticket-wrapper {
+                display: block !important;
+                height: 100vh !important;
+                width: 100vw !important;
+            }
+        }
     </style>
 <script type="importmap">
 {
@@ -32,10 +75,8 @@
   }
 }
 </script>
-<link rel="stylesheet" href="/index.css">
 </head>
 <body class="bg-gray-50 text-gray-900 overflow-x-hidden">
     <div id="root"></div>
-<script type="module" src="/index.tsx"></script>
 </body>
 </html>
