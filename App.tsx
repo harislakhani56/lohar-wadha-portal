@@ -125,6 +125,14 @@ const handleAdminLogin = async (e: React.FormEvent) => {
   }
 };
   const handleSubmit = async (e: React.FormEvent) => {
+    alert("Login successful");
+    setStep("admin");
+  } catch (error) {
+    alert("Invalid email or password");
+  }
+};
+  setStep("home");
+};
   e.preventDefault();
 
   // 1️⃣ Players check
@@ -132,77 +140,83 @@ const handleAdminLogin = async (e: React.FormEvent) => {
     p => p.name.trim() !== ''
   );
 
-  // 2️⃣ Contacts check
+  // 2️⃣ Contacts check (trimmed)
   const isContactsComplete =
-    formData.captainName.trim() !== '' &&
-    formData.captainContact.trim() !== '' &&
-    formData.viceCaptainName.trim() !== '' &&
-    formData.viceCaptainContact.trim() !== '' &&
-    formData.alternativeContact.trim() !== '';
+    formData.captainName.trim() &&
+    formData.captainContact.trim() &&
+    formData.viceCaptainName.trim() &&
+    formData.viceCaptainContact.trim() &&
+    formData.alternativeContact.trim();
 
-  // 3️⃣ Phone validation
+  // 3️⃣ Phone format check
   const phoneRegex = /^03[0-9]{9}$/;
   const arePhonesValid =
     phoneRegex.test(formData.captainContact) &&
     phoneRegex.test(formData.viceCaptainContact) &&
     phoneRegex.test(formData.alternativeContact);
 
-  // 4️⃣ Final validation
-  if (
-    formData.teamName.trim() &&
-    isPlayersComplete &&
-    isContactsComplete &&
-    arePhonesValid &&
-    formData.agreedToTerms
-  ) {
-    try {
+  // 4️⃣ Final validation check
+if (
+  formData.teamName.trim() &&
+  isPlayersComplete &&
+  isContactsComplete &&
+  arePhonesValid &&
+  formData.agreedToTerms
+) {
+  try {
 
-      if (editingRegId) {
-        await updateDoc(doc(db, "registrations", editingRegId), {
-          ...formData,
-          timestamp: new Date().toISOString()
-        });
-      } else {
+    console.log("About to save:", formData);
 
-        // Duplicate team check
-        const q = query(
-          collection(db, "registrations"),
-          where("teamName", "==", formData.teamName.trim())
-        );
+    if (editingRegId) {
 
-        const querySnapshot = await getDocs(q);
+      await updateDoc(doc(db, "registrations", editingRegId), {
+        ...formData,
+        timestamp: new Date().toISOString()
+      });
 
-        if (!querySnapshot.empty) {
-          alert("Team name already registered");
-          return;
-        }
+    } else {
 
-        await addDoc(collection(db, "registrations"), {
-          ...formData,
-          timestamp: new Date().toISOString()
-        });
+      // ✅ Duplicate team check (only for new registration)
+      const q = query(
+        collection(db, "registrations"),
+        where("teamName", "==", formData.teamName.trim())
+      );
+
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        alert("Team name already registered");
+        return;
       }
 
-      await fetchRegistrations();
-
-      if (adminAuth) setStep("admin");
-      else setStep("success");
-
-      resetForm();
-
-    } catch (error) {
-      console.error("Error saving data:", error);
-      alert("Error saving data");
+      // ✅ Save if no duplicate found
+      await addDoc(collection(db, "registrations"), {
+        ...formData,
+        timestamp: new Date().toISOString()
+      });
     }
 
-  } else {
-    alert(
-      lang === 'ur'
-        ? 'براہ کرم تمام معلومات مکمل کریں اور درست نمبر درج کریں'
-        : 'Please complete all fields with valid phone numbers'
-    );
+    console.log("Saved successfully");
+
+    await fetchRegistrations();
+
+    if (adminAuth) setStep('admin');
+    else setStep('success');
+
+    resetForm();
+
+  } catch (error) {
+    console.error("Error saving data:", error);
+    alert("Error saving data");
   }
-};
+
+} else {
+  alert(
+    lang === 'ur'
+      ? 'براہ کرم تمام معلومات مکمل کریں اور درست نمبر درج کریں'
+      : 'Please complete all fields with valid phone numbers'
+  );
+}
   if (adminPasswordInput === ADMIN_PASSWORD) {
     setAdminAuth(true);
     setStep('admin');
