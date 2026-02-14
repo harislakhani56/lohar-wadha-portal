@@ -39,7 +39,6 @@ import {
 import { Language, RegistrationData, Player, Message } from './types';
 import { getTournamentAssistance } from './geminiService';
 
-const ADMIN_PASSWORD = 'admin123';
 
 const App: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -55,6 +54,18 @@ const App: React.FC = () => {
   
   useEffect(() => {
   fetchRegistrations();
+}, []);
+
+  useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, (user) => {
+    if (user) {
+      setAdminAuth(true);
+    } else {
+      setAdminAuth(false);
+    }
+  });
+
+  return () => unsubscribe();
 }, []);
 
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
@@ -197,9 +208,6 @@ if (
       : 'Please complete all fields with valid phone numbers'
   );
 }
-  const handleAdminLogin = async (e?: React.FormEvent) => {
-  if (e) e.preventDefault();
-
   if (adminPasswordInput === ADMIN_PASSWORD) {
     setAdminAuth(true);
     setStep('admin');
