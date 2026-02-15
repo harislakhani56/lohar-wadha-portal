@@ -46,6 +46,23 @@ const App: React.FC = () => {
   const [step, setStep] = useState<'welcome' | 'form' | 'success' | 'admin'>('welcome');
   const [formStep, setFormStep] = useState(1); // 1: Team, 2: Contacts, 3: Players, 4: Payment Info
   const [registrations, setRegistrations] = useState<RegistrationData[]>([]);
+  
+  // Admin Search/Filter
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState<'all' | 'jamaati' | 'non-jamaati'>('all');
+  
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatInput, setChatInput] = useState('');
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isThinking, setIsThinking] = useState(false);
+  
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [adminPasswordInput, setAdminPasswordInput] = useState('');
+  const [loginError, setLoginError] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [adminAuth, setAdminAuth] = useState(false);
+
+  const [editingRegId, setEditingRegId] = useState<string | null>(null);
   useEffect(() => {
   const fetchRegistrations = async () => {
     try {
@@ -64,23 +81,6 @@ const App: React.FC = () => {
     fetchRegistrations();
   }
 }, [adminAuth]);
-  
-  // Admin Search/Filter
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'jamaati' | 'non-jamaati'>('all');
-  
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [chatInput, setChatInput] = useState('');
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [isThinking, setIsThinking] = useState(false);
-  
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
-  const [adminPasswordInput, setAdminPasswordInput] = useState('');
-  const [loginError, setLoginError] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [adminAuth, setAdminAuth] = useState(false);
-
-  const [editingRegId, setEditingRegId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<Omit<RegistrationData, 'regId' | 'timestamp'>>({
     teamName: '',
