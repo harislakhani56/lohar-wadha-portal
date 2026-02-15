@@ -94,21 +94,6 @@ const App: React.FC = () => {
     agreedToTerms: false
   });
 
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        setRegistrations(JSON.parse(saved));
-      } catch (e) {
-        console.error("Failed to load registrations", e);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(registrations));
-  }, [registrations]);
-
   const toggleLang = () => setLang(prev => prev === 'en' ? 'ur' : 'en');
 
   const handlePlayerChange = (id: number, name: string) => {
