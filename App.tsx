@@ -1,5 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { collection, addDoc } from "firebase/firestore";
+import { db } from "./firebase";
 import { 
   Trophy, 
   Users, 
@@ -115,7 +117,7 @@ const App: React.FC = () => {
     setFormStep(1);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingRegId) {
       setRegistrations(prev => prev.map(reg => 
@@ -127,11 +129,16 @@ const App: React.FC = () => {
       else setStep('success');
     } else {
       const newReg: RegistrationData = {
-        ...formData,
-        regId: `LW-${Math.floor(Math.random() * 90000) + 10000}`,
-        timestamp: new Date().toISOString()
-      };
-      setRegistrations(prev => [newReg, ...prev]);
+  ...formData,
+  regId: `LW-${Math.floor(Math.random() * 90000) + 10000}`,
+  timestamp: new Date().toISOString()
+};
+
+// 🔥 SAVE TO FIRESTORE
+await addDoc(collection(db, "registrations"), newReg);
+
+// Optional: local state update (for instant UI)
+setRegistrations(prev => [newReg, ...prev]);
       if (adminAuth && step === 'form') setStep('admin');
       else setStep('success');
     }
