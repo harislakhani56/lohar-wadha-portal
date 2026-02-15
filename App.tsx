@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { collection, addDoc } from "firebase/firestore";
+import { collection, addDoc, getDocs } from "firebase/firestore";
 import { db } from "./firebase";
 import { 
   Trophy, 
@@ -37,7 +37,6 @@ import {
 import { Language, RegistrationData, Player, Message } from './types';
 import { getTournamentAssistance } from './geminiService';
 
-const STORAGE_KEY = 'lohar_wadha_registrations_v3';
 const ADMIN_PASSWORD = 'admin123';
 const EASY_PAISA_NUMBER = '03272587785';
 const EASY_PAISA_NAME = 'Haris Mubarak';
@@ -47,6 +46,24 @@ const App: React.FC = () => {
   const [step, setStep] = useState<'welcome' | 'form' | 'success' | 'admin'>('welcome');
   const [formStep, setFormStep] = useState(1); // 1: Team, 2: Contacts, 3: Players, 4: Payment Info
   const [registrations, setRegistrations] = useState<RegistrationData[]>([]);
+  useEffect(() => {
+  const fetchRegistrations = async () => {
+    try {
+      const snapshot = await getDocs(collection(db, "registrations"));
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setRegistrations(data as RegistrationData[]);
+    } catch (error) {
+      console.error("Error fetching registrations:", error);
+    }
+  };
+
+  if (adminAuth) {
+    fetchRegistrations();
+  }
+}, [adminAuth]);
   
   // Admin Search/Filter
   const [searchTerm, setSearchTerm] = useState('');
