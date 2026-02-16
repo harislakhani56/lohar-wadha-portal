@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lohar Wadha Tournament Registration</title>
+    <title>Loharwadha Tournament Registration</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Nastaliq+Urdu:wght@400;700&display=swap" rel="stylesheet">
     <style>
@@ -41,7 +41,7 @@
             animation: pulse-subtle 3s infinite ease-in-out;
         }
 
-        /* High-Fidelity Print Styles for Screenshot/Save functionality */
+        /* High-Fidelity Print Styles */
         @media print {
             @page {
                 size: A4;
@@ -65,7 +65,6 @@
                 width: 100% !important;
                 max-width: none !important;
             }
-            /* Isolate the ticket for a clean save */
             #printable-ticket {
                 visibility: visible !important;
                 position: absolute !important;
@@ -80,7 +79,6 @@
                 transform: none !important;
                 page-break-after: always;
             }
-            /* Hide everything else during print */
             body > *:not(#root), #root > *:not(main), main > *:not(#printable-ticket-wrapper) {
                 display: none !important;
             }
@@ -91,6 +89,39 @@
                 padding: 0 !important;
                 margin: 0 !important;
             }
+            .watermark-overlay {
+                display: flex !important;
+                opacity: 0.12 !important; /* Slightly higher for print clarity */
+                -webkit-print-color-adjust: exact !important;
+            }
+        }
+
+        .watermark-container {
+            position: relative;
+            z-index: 1;
+            background: white;
+        }
+        .watermark-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+        }
+        .watermark-image {
+            width: 80%;
+            height: auto;
+            max-width: 550px;
+            opacity: 0.08; /* User requested 5-10% */
+            transform: rotate(-12deg);
+            mix-blend-mode: multiply; /* Removes white background from logo */
+            filter: sepia(0.2) contrast(1.1); /* Gives it a slight bronze tint */
         }
     </style>
 <script type="importmap">
@@ -106,10 +137,8 @@
   }
 }
 </script>
-<link rel="stylesheet" href="/index.css">
 </head>
 <body class="bg-gray-50 text-gray-900 overflow-x-hidden">
     <div id="root"></div>
-<script type="module" src="/index.tsx"></script>
 </body>
 </html>
