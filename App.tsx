@@ -219,7 +219,9 @@ const App: React.FC = () => {
   };
 
   try {
+    console.log("About to save:", formData);
     await addDoc(collection(db, "registrations"), newReg);
+    console.log("Saved successfully");
 
     setLastSubmittedData(newReg);
     setStep('success');
