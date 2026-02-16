@@ -207,32 +207,28 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validateSquad()) return;
+  const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
 
-    if (editingRegId) {
-      const updatedData: RegistrationData = { 
-        ...formData, 
-        regId: editingRegId, 
-        timestamp: new Date().toISOString() 
-      };
-      setRegistrations(prev => prev.map(reg => 
-        reg.regId === editingRegId ? updatedData : reg
-      ));
-      setLastSubmittedData(updatedData);
-      setStep('success');
-    } else {
-      const newReg: RegistrationData = {
-        ...formData,
-        regId: `LW-${Math.floor(Math.random() * 90000) + 10000}`,
-        timestamp: new Date().toISOString()
-      };
-      setRegistrations(prev => [newReg, ...prev]);
-      setLastSubmittedData(newReg);
-      setStep('success');
-    }
+  if (!validateSquad()) return;
+
+  const newReg: RegistrationData = {
+    ...formData,
+    regId: `LW-${Math.floor(Math.random() * 90000) + 10000}`,
+    timestamp: new Date().toISOString()
   };
+
+  try {
+    await addDoc(collection(db, "registrations"), newReg);
+
+    setLastSubmittedData(newReg);
+    setStep('success');
+
+  } catch (error) {
+    console.error("Firebase save error:", error);
+    alert("Data save failed");
+  }
+};
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
