@@ -1,6 +1,7 @@
+
 {
-  "name": "Lohar Wadha Tournament Portal",
-  "description": "An official registration system for the Lohar Wadha Tournament, featuring dual-language support (Urdu/English), real-time validation, and an AI-powered tournament assistant.",
+  "name": "Loharwadha Tournament Portal",
+  "description": "An official registration system for the Loharwadha Tournament, featuring dual-language support (Urdu/English), real-time validation, and an AI-powered tournament assistant.",
   "requestFramePermissions": [
     "camera"
   ]
