@@ -1,5 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { collection, addDoc, getDocs } from "firebase/firestore";
+import { db } from "./firebase";
 import { 
   Trophy, 
   Users, 
@@ -39,7 +41,6 @@ import {
 } from 'lucide-react';
 import { Language, RegistrationData, Player, Message } from './types';
 
-const STORAGE_KEY = 'loharwadha_registrations_v7';
 const ADMIN_PASSWORD = '@Youth#1123';
 // Updated to a bronze-colored logo representative of the community emblem
 const LOGO_URL = 'https://i.postimg.cc/85z1Y7J4/bronze-logo.png'; 
@@ -63,6 +64,26 @@ const App: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [adminAuth, setAdminAuth] = useState(false);
   const [editingRegId, setEditingRegId] = useState<string | null>(null);
+  
+  useEffect(() => {
+  const fetchRegistrations = async () => {
+    try {
+      const snapshot = await getDocs(collection(db, "registrations"));
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setRegistrations(data as RegistrationData[]);
+    } catch (error) {
+      console.error("Error fetching registrations:", error);
+    }
+  };
+
+  if (adminAuth) {
+    fetchRegistrations();
+  }
+}, [adminAuth]);
+
   const [lastSubmittedData, setLastSubmittedData] = useState<RegistrationData | null>(null);
   
   const [viewingReg, setViewingReg] = useState<RegistrationData | null>(null);
@@ -85,21 +106,6 @@ const App: React.FC = () => {
     players: initialPlayers,
     agreedToTerms: false
   });
-
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        setRegistrations(JSON.parse(saved));
-      } catch (e) {
-        console.error("Failed to load registrations", e);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(registrations));
-  }, [registrations]);
 
   const toggleLang = () => setLang(prev => prev === 'en' ? 'ur' : 'en');
 
