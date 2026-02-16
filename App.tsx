@@ -1,17 +1,13 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { collection, addDoc, getDocs } from "firebase/firestore";
-import { db } from "./firebase";
 import { 
   Trophy, 
   Users, 
   FileText, 
   ShieldCheck, 
   Globe, 
-  Send, 
   CheckCircle2, 
   AlertCircle,
-  MessageSquare,
   X,
   Settings,
   Download,
@@ -32,119 +28,149 @@ import {
   Share2,
   Image as ImageIcon,
   CreditCard,
-  Copy
+  Copy,
+  Upload,
+  Info,
+  CalendarClock,
+  Printer,
+  Mail,
+  MessageCircle,
+  Maximize2
 } from 'lucide-react';
 import { Language, RegistrationData, Player, Message } from './types';
-import { getTournamentAssistance } from './geminiService';
 
+const STORAGE_KEY = 'lohar_wadha_registrations_v6';
 const ADMIN_PASSWORD = 'admin123';
-const EASY_PAISA_NUMBER = '03272587785';
-const EASY_PAISA_NAME = 'Haris Mubarak';
 
 const App: React.FC = () => {
   const [lang, setLang] = useState<Language>('ur');
   const [step, setStep] = useState<'welcome' | 'form' | 'success' | 'admin'>('welcome');
-  const [formStep, setFormStep] = useState(1); // 1: Team, 2: Contacts, 3: Players, 4: Payment Info
+  const [formStep, setFormStep] = useState(1);
   const [registrations, setRegistrations] = useState<RegistrationData[]>([]);
   
-  // Admin Search/Filter
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'jamaati' | 'non-jamaati'>('all');
-  
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [chatInput, setChatInput] = useState('');
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [isThinking, setIsThinking] = useState(false);
-  
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [adminPasswordInput, setAdminPasswordInput] = useState('');
   const [loginError, setLoginError] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [adminAuth, setAdminAuth] = useState(false);
-
   const [editingRegId, setEditingRegId] = useState<string | null>(null);
-  useEffect(() => {
-  const fetchRegistrations = async () => {
-    try {
-      const snapshot = await getDocs(collection(db, "registrations"));
-      const data = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setRegistrations(data as RegistrationData[]);
-    } catch (error) {
-      console.error("Error fetching registrations:", error);
-    }
-  };
+  const [lastSubmittedData, setLastSubmittedData] = useState<RegistrationData | null>(null);
+  
+  // Admin specific viewing state
+  const [viewingReg, setViewingReg] = useState<RegistrationData | null>(null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
-  if (adminAuth) {
-    fetchRegistrations();
-  }
-}, [adminAuth]);
+  const initialPlayers: Player[] = Array.from({ length: 11 }, (_, i) => ({ 
+    id: i + 1, 
+    name: '', 
+    age: '', 
+    phone: '', 
+    cnic: '', 
+    cnicImage: '' 
+  }));
 
   const [formData, setFormData] = useState<Omit<RegistrationData, 'regId' | 'timestamp'>>({
     teamName: '',
+    jamatName: '',
     captainName: '',
-    captainContact: '',
     viceCaptainName: '',
-    viceCaptainContact: '',
-    alternativeContact: '',
-    players: Array.from({ length: 11 }, (_, i) => ({ id: i + 1, name: '' })),
-    teamType: 'non-jamaati',
+    players: initialPlayers,
     agreedToTerms: false
   });
 
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        setRegistrations(JSON.parse(saved));
+      } catch (e) {
+        console.error("Failed to load registrations", e);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(registrations));
+  }, [registrations]);
+
   const toggleLang = () => setLang(prev => prev === 'en' ? 'ur' : 'en');
 
-  const handlePlayerChange = (id: number, name: string) => {
+  const formatPhone = (val: string) => {
+    const digits = val.replace(/\D/g, '').slice(0, 11);
+    if (digits.length <= 4) return digits;
+    return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+  };
+
+  const formatCNIC = (val: string) => {
+    const digits = val.replace(/\D/g, '').slice(0, 13);
+    if (digits.length <= 5) return digits;
+    if (digits.length <= 12) return `${digits.slice(0, 5)}-${digits.slice(5)}`;
+    return `${digits.slice(0, 5)}-${digits.slice(5, 12)}-${digits.slice(12)}`;
+  };
+
+  const handlePlayerChange = (id: number, field: keyof Player, value: string) => {
+    let finalValue = value;
+    if (field === 'phone') {
+      finalValue = formatPhone(value);
+    } else if (field === 'cnic') {
+      finalValue = formatCNIC(value);
+    }
+
     setFormData(prev => ({
       ...prev,
-      players: prev.players.map(p => p.id === id ? { ...p, name } : p)
+      players: prev.players.map(p => p.id === id ? { ...p, [field]: finalValue } : p)
     }));
+  };
+
+  const handleImageUpload = (id: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        handlePlayerChange(id, 'cnicImage', reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const resetForm = () => {
     setFormData({
       teamName: '',
+      jamatName: '',
       captainName: '',
-      captainContact: '',
       viceCaptainName: '',
-      viceCaptainContact: '',
-      alternativeContact: '',
-      players: Array.from({ length: 11 }, (_, i) => ({ id: i + 1, name: '' })),
-      teamType: 'non-jamaati',
+      players: initialPlayers,
       agreedToTerms: false
     });
     setEditingRegId(null);
     setFormStep(1);
+    setLastSubmittedData(null);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingRegId) {
+      const updatedData: RegistrationData = { 
+        ...formData, 
+        regId: editingRegId, 
+        timestamp: new Date().toISOString() 
+      };
       setRegistrations(prev => prev.map(reg => 
-        reg.regId === editingRegId 
-          ? { ...reg, ...formData, timestamp: new Date().toISOString() } 
-          : reg
+        reg.regId === editingRegId ? updatedData : reg
       ));
-      if (adminAuth) setStep('admin');
-      else setStep('success');
+      setLastSubmittedData(updatedData);
+      setStep('success');
     } else {
       const newReg: RegistrationData = {
-  ...formData,
-  regId: `LW-${Math.floor(Math.random() * 90000) + 10000}`,
-  timestamp: new Date().toISOString()
-};
-
-// 🔥 SAVE TO FIRESTORE
-await addDoc(collection(db, "registrations"), newReg);
-
-// Optional: local state update (for instant UI)
-setRegistrations(prev => [newReg, ...prev]);
-      if (adminAuth && step === 'form') setStep('admin');
-      else setStep('success');
+        ...formData,
+        regId: `LW-${Math.floor(Math.random() * 90000) + 10000}`,
+        timestamp: new Date().toISOString()
+      };
+      setRegistrations(prev => [newReg, ...prev]);
+      setLastSubmittedData(newReg);
+      setStep('success');
     }
-    resetForm();
   };
 
   const copyToClipboard = (text: string) => {
@@ -169,13 +195,10 @@ setRegistrations(prev => [newReg, ...prev]);
   const startEdit = (reg: RegistrationData) => {
     setFormData({
       teamName: reg.teamName,
+      jamatName: reg.jamatName,
       captainName: reg.captainName,
-      captainContact: reg.captainContact,
       viceCaptainName: reg.viceCaptainName,
-      viceCaptainContact: reg.viceCaptainContact,
-      alternativeContact: reg.alternativeContact,
       players: reg.players,
-      teamType: reg.teamType,
       agreedToTerms: reg.agreedToTerms
     });
     setEditingRegId(reg.regId);
@@ -184,8 +207,8 @@ setRegistrations(prev => [newReg, ...prev]);
 
   const exportToCSV = () => {
     if (registrations.length === 0) return;
-    const headers = ['Reg ID', 'Date', 'Team', 'Type', 'Captain', 'Capt Contact', 'Vice Captain', 'Vice Contact', 'Alt Contact'];
-    const rows = registrations.map(reg => [reg.regId, new Date(reg.timestamp).toLocaleDateString(), reg.teamName, reg.teamType, reg.captainName, reg.captainContact, reg.viceCaptainName, reg.viceCaptainContact, reg.alternativeContact]);
+    const headers = ['Reg ID', 'Date', 'Team', 'Jamat Name', 'Captain', 'Vice Captain'];
+    const rows = registrations.map(reg => [reg.regId, new Date(reg.timestamp).toLocaleDateString(), reg.teamName, reg.jamatName, reg.captainName, reg.viceCaptainName]);
     const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -205,96 +228,117 @@ setRegistrations(prev => [newReg, ...prev]);
     const matchesSearch = 
       reg.teamName.toLowerCase().includes(searchTerm.toLowerCase()) || 
       reg.captainName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      reg.jamatName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       reg.regId.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = filterType === 'all' || reg.teamType === filterType;
-    return matchesSearch && matchesType;
+    return matchesSearch;
   });
-
-  const handleChatSend = async () => {
-    if (!chatInput.trim()) return;
-    const userMsg: Message = { role: 'user', text: chatInput };
-    setMessages(prev => [...prev, userMsg]);
-    setChatInput('');
-    setIsThinking(true);
-    const history = messages.map(m => ({ role: m.role, parts: [{ text: m.text }] }));
-    const response = await getTournamentAssistance(chatInput, history);
-    setMessages(prev => [...prev, { role: 'model', text: response || '' }]);
-    setIsThinking(false);
-  };
 
   const content = {
     en: {
       title: "Lohar Wadha Tournament",
       subtitle: "Official Registration Portal",
-      announcement: "Registration for the upcoming Lohar Wadha Tournament is now open for all teams.",
-      step1: "Team Basics", step2: "Leadership", step3: "Squad", step4: "Payment Info",
-      teamName: "Team Name", captainName: "Captain Name", captainContact: "Captain Phone",
-      viceCaptainName: "Vice Captain Name", viceCaptainContact: "Vice Captain Phone",
-      alternativeContact: "Emergency Contact", teamType: "Category",
-      jamaati: "Jamaati", nonJamaati: "Non-Jamaati",
+      announcement: "Registration for the upcoming Lohar Wadha Tournament is now open. Total 10 teams only.",
+      step1: "Team & Jamat", step2: "Leadership", step3: "Squad", step4: "Payment Info",
+      teamName: "Team Name", jamatName: "Jamat Name",
+      captainName: "Captain Name", viceCaptainName: "Vice Captain Name",
       player: "Player", terms: "Tournament Rules",
       submit: editingRegId ? "Update Info" : "Complete Registration",
       next: "Next Step", back: "Back", start: "Register Now",
       successTitle: "Registration Confirmed!",
-      successMsg: "Your team is officially in! Please ensure the 10,000 PKR entry fee is paid via EasyPaisa to confirm your slot.",
+      successMsg: "Your registration form has been generated. Please save this for your records. Payment details will be provided after verification.",
       adminTitle: "Management Portal", totalTeams: "Total Teams",
       export: "Export CSV", noData: "No entries found.",
       loginTitle: "Management Login", loginPrompt: "Enter secure password",
-      loginBtn: "Login", chatTitle: "Tournament Assistant",
+      loginBtn: "Login", 
       invalidPass: "Invalid Access Code", addTeam: "Manual Entry",
       editTeam: "Update Record", search: "Search teams...",
-      paymentHeading: "EasyPaisa Payment",
-      paymentInstruction: "Please send the 10,000 PKR entry fee to the following EasyPaisa account and keep the screenshot for verification.",
-      accountNumber: "Account Number",
-      accountName: "Account Name",
+      paymentHeading: "Payment Information",
+      paymentInstruction: "Payment details will be shared after teams confirm.",
+      paymentDeadlineLabel: "Last Day to Submit Fees",
+      paymentDeadlineDate: "18-Feb-2026",
+      colName: "Name", colAge: "Age", colPhone: "Phone", colCNIC: "CNIC/B-Form", colImage: "CNIC Picture Upload",
+      squadNotice: "If a player does not have a CNIC, enter the B-Form number and upload a personal photo instead of the CNIC image.",
+      returnHome: "Return Home",
+      registrationFormTitle: "OFFICIAL REGISTRATION FORM - 2026",
+      contactUs: "Contact Us",
+      contactEmail: "Email",
+      thankYouNote: "Thank you for registration. If you are shortlisted, we will inform you.",
+      orgName: "Lohar Wada Youth Organization",
+      orgMotto: "(ایک نئی سوچ، ایک نئی تعمیر)",
       rules: [
         "Tournament entry fee: 10,000 PKR per team.",
-        "Entry fee must be paid before tournament starts.",
-        "Committee provides professional balls & tape.",
-        "Over cuts for late arrivals (Punctuality mandatory).",
-        "Zero tolerance for bad conduct/disturbance.",
-        "Umpire's decision is final and binding.",
-        "Direct complaints to committee members only.",
-        "No arguing with umpires during matches.",
-        "No outsiders; only registered squad can play.",
-        "Pool matches: 6 overs. Semi/Finals: 7 overs."
+        "Entry fee must be paid by the assigned deadline before the tournament starts.",
+        "Tournament committee will provide balls and tape. Winners and Runners-up will receive trophies and prize money.",
+        "All matches will consist of 6 overs (except semi-finals and finals).",
+        "Tournament will consist of 10 teams: 5 from Lohar Wadha and 5 from other Kutchi communities.",
+        "10 teams will be divided into 2 groups; each team plays 4 group matches.",
+        "All teams must arrive at the ground by 10:30 PM. Overs will be cut for arrivals after 11:00 PM.",
+        "Kutchi community teams must only include players from that specific community.",
+        "Each team must submit player details verified on their community's official letterhead.",
+        "Playing non-community players will result in immediate disqualification.",
+        "Only registered players listed on the form are allowed to play; no substitutions allowed.",
+        "Boundary and scoring rules specific to Lohar Wadha Hall will be briefed to captains before match start.",
+        "In case of disputes, only the captain may talk to umpires or the committee.",
+        "Captains are responsible for team behavior. Warning followed by player expulsion for misconduct.",
+        "Repeated violations will result in the entire team being disqualified.",
+        "Arguing, shouting, or misbehavior with umpires results in immediate 3-over penalty and player expulsion.",
+        "Abusive language, fighting, or provoking opponents results in immediate permanent expulsion.",
+        "Disrupting the tournament or fighting after losing results in a permanent ban for the team and players.",
+        "Compliance with all rules and regulations is mandatory for every team.",
+        "Lohar Wadha Youth Committee and Tournament Committee decisions are final and binding."
       ]
     },
     ur: {
       title: "لوہار وادھا ٹورنامنٹ",
       subtitle: "آفیشل رجسٹریشن پورٹل",
-      announcement: "لوہار وادھا ٹورنامنٹ کے لیے ٹیموں کی رجسٹریشن کا باقاعدہ آغاز کیا جا رہا ہے۔",
-      step1: "ٹیم کی تفصیل", step2: "قیادت", step3: "کھلاڑیوں کی فہرست", step4: "پیمنٹ کی تفصیل",
-      teamName: "ٹیم کا نام", captainName: "کپتان کا نام", captainContact: "کپتان کا فون",
-      viceCaptainName: "نائب کپتان کا نام", viceCaptainContact: "نائب کپتان کا فون",
-      alternativeContact: "متبادل رابطہ", teamType: "ٹیم کی قسم",
-      jamaati: "جماعتی", nonJamaati: "غیر جماعتی",
+      announcement: "لوہار وادھا ٹورنامنٹ کے لیے رجسٹریشن کا آغاز ہو چکا ہے۔ صرف 10 ٹیموں کی گنجائش ہے۔",
+      step1: "ٹیم اور جماعت", step2: "قیادت", step3: "کھلاڑیوں کی فہرست", step4: "پیمنٹ کی تفصیل",
+      teamName: "ٹیم کا نام", jamatName: "جماعت کا نام",
+      captainName: "کپتان کا نام", viceCaptainName: "نائب کپتان کا نام",
       player: "کھلاڑی", terms: "قواعد و ضوابط",
       submit: editingRegId ? "معلومات تبدیل کریں" : "رجسٹریشن مکمل کریں",
       next: "اگلا مرحلہ", back: "واپس", start: "رجسٹریشن شروع کریں",
       successTitle: "رجسٹریشن مکمل ہوگئی!",
-      successMsg: "آپ کی ٹیم رجسٹر ہو چکی ہے۔ براہِ کرم یقینی بنائیں کہ انٹری فیس (10,000 روپے) ایزی پیسہ کے ذریعے ادا کر دی گئی ہے۔",
+      successMsg: "آپ کا رجسٹریشن فارم تیار کر دیا گیا ہے۔ براہِ کرم اسے محفوظ کریں؛ ادائیگی کی تفصیلات تصدیق کے بعد فراہم کی جائیں گی۔",
       adminTitle: "مینجمنٹ ڈیش بورڈ", totalTeams: "کل ٹیمیں",
       export: "CSV ڈاؤن لوڈ کریں", noData: "کوئی ریکارڈ نہیں ملا۔",
       loginTitle: "مینجمنٹ لاگ ان", loginPrompt: "سیکیورٹی پاس ورڈ درج کریں",
-      loginBtn: "لاگ ان کریں", chatTitle: "ٹورنامنٹ اسسٹنٹ",
+      loginBtn: "لاگ ان کریں", 
       invalidPass: "غلط پاس ورڈ", addTeam: "نئی ٹیم شامل کریں",
       editTeam: "معلومات اپ ڈیٹ کریں", search: "ٹیم تلاش کریں...",
-      paymentHeading: "ایزی پیسہ ادائیگی",
-      paymentInstruction: "براہِ کرم ٹورنامنٹ کی انٹری فیس (10,000 روپے) مندرجہ ذیل ایزی پیسہ اکاؤنٹ پر ارسال کریں اور تصدیق کے لیے اسکرین شاٹ اپنے پاس محفوظ رکھیں۔",
-      accountNumber: "اکاؤنٹ نمبر",
-      accountName: "اکاؤنٹ ہولڈر کا نام",
+      paymentHeading: "پیمنٹ کی معلومات",
+      paymentInstruction: "پیمنٹ کی تفصیلات ٹیموں کی تصدیق کے بعد شیئر کی جائیں گی۔",
+      paymentDeadlineLabel: "فیس جمع کروانے کی آخری تاریخ",
+      paymentDeadlineDate: "18 فروری 2026",
+      colName: "نام", colAge: "عمر", colPhone: "فون نمبر", colCNIC: "CNIC/ب فارم", colImage: "CNIC تصویر اپ لوڈ",
+      squadNotice: "اگر کسی کھلاڑی کے پاس CNIC نہیں ہے تو ب-فارم نمبر درج کریں اور CNIC تصویر کے بجائے اپنی ذاتی تصویر اپ لوڈ کریں۔",
+      returnHome: "ہوم پیج پر جائیں",
+      registrationFormTitle: "آفیشل رجسٹریشن فارم - 2026",
+      contactUs: "رابطہ کریں",
+      contactEmail: "ای میل",
+      thankYouNote: "رجسٹریشن کے لیے شکریہ۔ اگر آپ کو شارٹ لسٹ کیا گیا تو ہم آپ کو مطلع کریں گے۔",
+      orgName: "لوہارواڈھا یوتھ آرگنائزیشن",
+      orgMotto: "(ایک نئی سوچ، ایک نئی تعمیر)",
       rules: [
-        "ٹورنامنٹ کی انٹری فیس 10,000 روپے فی ٹیم ہوگی۔",
-        "انٹری فیس ٹورنامنٹ شروع ہونے سے پہلے جمع کروانا ضروری ہے۔",
-        "ٹورنامنٹ میں بالز اور ٹیپ کمیٹی فراہم کرے گی۔",
-        "وقت کی پابندی لازمی ہے؛ دیر سے آنے پر اوورز کٹیں گے۔",
-        "بدمزگی پھیلانے والی ٹیم کو فوری باہر کر دیا جائے گا۔",
-        "امپائر کا فیصلہ حتمی ہوگا۔",
-        "شکایات کے لیے براہِ راست کمیٹی سے رابطہ کریں۔",
-        "دورانِ میچ امپائر سے بحث کرنا سختی سے منع ہے۔",
-        "صرف رجسٹرڈ کھلاڑی کھیل سکتے ہیں؛ باہر سے کوئی نہیں آئے گا۔",
-        "پول میچ 6 اوورز؛ سیمی فائنل/فائنل 7 اوورز کے ہوں گے۔"
+        "ٹورنامنٹ کی انٹری فیس 10,000 ایک ٹیم ہوگی۔",
+        "انٹری فیس ٹورنامنٹ شروع ہونے سے پہلے کی مقررہ تاریخ تک جمع کروانا لازمی ہوگی۔",
+        "ٹورنامنٹ میں بال اور ٹیپ ٹورنامنٹ کمیٹی دے گی۔اور فائنل اور رنراپ کو ٹرافی کے ساتھ ساتھ انعامی رقم بھی دی جاے گی",
+        "ٹورنامنٹ کے تمام میچز 6 اوورز پر مشتمل ہو گے۔(سیمی فائنل اور فائنل کے علاوہ)",
+        "یہ ٹورنامنٹ ٹوٹل 10 ٹیموں پر مشتمل ہوگا۔جس میں 5 ٹیمیں لوہارواڈھا برادری اور باقی 5 ٹیمیں دیگر کچھی کمیونٹی سے ہوگی۔",
+        "10 ٹیموں کو 2 گروپ میں تقسیم کیا جائے گا۔ اور ہر ایک ٹیم اپنے 4 میچز کھیلے گی",
+        "ٹورنامنٹ کی تمام ٹیموں کو رات10:30 تک گروانڈ میں ہونا لازمی ہے11:00 بجے کے بعد آنے والی ٹیم کے ٹائم کے حساب سے اوورز کی کٹوتی کی جائے گی",
+        "جو بھی ٹیم کسی بھی کچھی کمیونٹی کی طرف سے کھیلے گی اس ٹیم میں صرف و صرف اسی کچھی کمیونٹی کے کھلاڑی کھیل سکتے ہیں۔",
+        "ہر ٹیم اپنے کھلاڑیوں کی ڈیٹیل اپنے کمیونٹی کے لیٹر ہیڈ پر تصدیقی طور پر جمع کروائے گی۔",
+        "غیر کمیونٹی کھلاڑی کو ٹیم میں کھلانے پر ٹیم کو ٹورنامنٹ سے باہر کردیا جائے گا۔ ریجسٹریشن فارم پر ریجسٹرد کیے ہوئے پلیئرز کے علاوہ کوئی اور پلیئرز نہیں کھیلے گا۔",
+        "جیسا کہ یہ ٹورنامنٹ لوہارواڈھا ھال میں ہے تو اس ٹورنامنٹ کی باؤنڈری کی حدود اور اسکور کے رولز کپتان کو میچ شروع ہونے سے پہلے بتا دیے جاے گے",
+        "میچ کے دوران کسی بھی قسم کے تنازعات کی صورت میں اس ٹیم کا کپتان ہی امپائر اور ٹورنامنٹ کمیٹی سے بات کرےگا۔",
+        "ہر ٹیم کا کپتان اپنی پوری ٹیم کے رویے کا ذمہ دار ہوگااگر کسی کھلاڑی نے بدتمیزی کی تو پہلے کپتان کو وارننگ دی جائے گی۔اس کے بعد بھی اس کھلاڑی کا رویّہ درست نہیں ہوا تو اس کھلاڑی کو ٹورنامنٹ سے باہر کردیا جائے گا۔",
+        "مسلسل خلاف ورزی پر پوری ٹیم کو ٹورنامنٹ سے باہر کردیا جائے گا۔",
+        "امپائر کے فیصلے پر بحث، چیخنا چلانا یا بدتمیزی پر فوری جرمانہ کے طور پر دوران میچ 3 اوورز کی کٹوتی کی جائے گی اور امپائر سے بدتمیزی کرنے والا کھلاڑی اسی وقت گراؤنڈ سے باہر بھی ہوگا۔",
+        "کسی بھی قسم کی گالم گلوج، بدتمیزی لڑائی جگڑے یا مخالف ٹیم کو اشتعال دلانے پر فوری طور ٹیم کو اسی وقت ٹورنامنٹ سے ہمیشہ کے لئے باہر کر دیا جائے گا۔",
+        "کوئی ٹیم ہارنے کی صورت میں جان بوجھ کر لڑائی جگڑے گالم گلوج اور فسادات کرنے اور ٹورنامنٹ کو خراب کرنے کی کوشش کرے گی اس ٹیم اور ٹیم کے تمام کھلاڑیوں پر ہمیشہ کے لیے اس ٹورنامنٹ میں کھیلنے پر پابندی عائد کردی جائے گی۔",
+        "ہر ٹیم کو اس رولز ریگولیشن اور قوانین پر عمل درآمد کرنا لازمی ہوگا۔",
+        "کسی بھی تنازعات ، شکایات، یا دیگر معاملے میں لوہارواڈھا یوتھ کمیٹی اور ٹورنامنٹ کمیٹی کا فیصلہ حتمی اور قابل قبول ہوگا۔ جس پر تمام ٹیموں کو عمل کرنا لازمی ہوگا۔"
       ]
     }
   };
@@ -302,10 +346,16 @@ setRegistrations(prev => [newReg, ...prev]);
   const t = content[lang];
   const isRTL = lang === 'ur';
 
+  const contactList = [
+    { name: isRTL ? "مزمل" : "Muzammil", phone: "03360024657" },
+    { name: isRTL ? "نعمان" : "Noman", phone: "03232179217" },
+    { name: isRTL ? "مصطفیٰ" : "Mustafa", phone: "03062858558" },
+    { name: isRTL ? "لوہارواڈھا یوتھ" : "Lohar Wadha Youth", phone: "0325338338" },
+  ];
+
   return (
     <div className={`min-h-screen flex flex-col ${isRTL ? 'font-urdu' : 'font-sans'} bg-slate-50`} dir={isRTL ? 'rtl' : 'ltr'}>
-      {/* Dynamic Navbar */}
-      <nav className="sticky top-0 z-50 glass shadow-md px-6 py-4 flex justify-between items-center border-b border-emerald-100">
+      <nav className="sticky top-0 z-50 glass shadow-md px-6 py-4 flex justify-between items-center border-b border-emerald-100 no-print">
         <div className="flex items-center gap-3 cursor-pointer group" onClick={() => { setStep('welcome'); resetForm(); }}>
           <div className="bg-emerald-600 p-2.5 rounded-xl text-white shadow-lg group-hover:scale-110 transition-transform">
             <Trophy size={28} />
@@ -323,7 +373,7 @@ setRegistrations(prev => [newReg, ...prev]);
         </div>
       </nav>
 
-      <main className="flex-1 max-w-5xl mx-auto w-full px-4 py-10">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-10">
         {step === 'welcome' && (
           <div className="animate-in fade-in slide-in-from-bottom-6 duration-700 max-w-4xl mx-auto space-y-8">
             <div className="bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-100">
@@ -346,15 +396,49 @@ setRegistrations(prev => [newReg, ...prev]);
                     <ShieldAlert size={32} className="text-amber-500" />
                     {t.terms}
                   </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[400px] overflow-y-auto custom-scrollbar p-2">
                     {t.rules.map((rule, idx) => (
-                      <div key={idx} className="bg-white/70 p-4 rounded-2xl border border-amber-200 flex gap-4 items-center transform hover:scale-[1.02] transition-transform">
+                      <div key={idx} className="bg-white/70 p-4 rounded-2xl border border-amber-200 flex gap-4 items-start transform hover:scale-[1.01] transition-transform">
                         <span className="shrink-0 bg-amber-500 w-8 h-8 rounded-full flex items-center justify-center text-sm font-black text-white shadow-md">
                           {idx + 1}
                         </span>
-                        <p className="text-amber-900 text-sm font-bold leading-tight">{rule}</p>
+                        <p className="text-amber-900 text-sm font-bold leading-relaxed">{rule}</p>
                       </div>
                     ))}
+                  </div>
+                </div>
+
+                <div className="bg-emerald-50 rounded-[2rem] p-8 border border-emerald-100 shadow-sm space-y-8">
+                  <h3 className="flex items-center gap-3 font-black text-emerald-900 text-2xl">
+                    <MessageCircle size={32} className="text-emerald-600" />
+                    {t.contactUs}
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    {contactList.map((contact, idx) => (
+                      <div key={idx} className="bg-white p-4 rounded-2xl border border-emerald-200 flex justify-between items-center shadow-sm">
+                        <div className="space-y-1">
+                          <p className="text-[10px] text-emerald-600 font-black uppercase tracking-widest">{contact.name}</p>
+                          <p className="text-lg font-black text-slate-800 tracking-tight">{contact.phone}</p>
+                        </div>
+                        <a href={`tel:${contact.phone}`} className="p-3 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all">
+                          <Phone size={20} />
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="bg-white p-5 rounded-2xl border border-emerald-200 shadow-sm flex flex-col sm:flex-row justify-between items-center gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-emerald-50 p-2 rounded-xl text-emerald-600">
+                        <Mail size={24} />
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-[10px] text-emerald-600 font-black uppercase tracking-widest">{t.contactEmail}</p>
+                        <p className="text-sm sm:text-base font-black text-slate-800 break-all">loharwadayouthorganization@gmail.com</p>
+                      </div>
+                    </div>
+                    <button onClick={() => copyToClipboard("loharwadayouthorganization@gmail.com")} className="p-3 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all">
+                      <Copy size={20} />
+                    </button>
                   </div>
                 </div>
 
@@ -369,9 +453,8 @@ setRegistrations(prev => [newReg, ...prev]);
         )}
 
         {step === 'form' && (
-          <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
-            {/* Progress Bar */}
-            <div className="flex justify-between items-center px-2 mb-4">
+          <div className="max-w-full mx-auto space-y-8 animate-in fade-in duration-500">
+            <div className="flex justify-between items-center px-2 mb-4 max-w-4xl mx-auto">
               {[1, 2, 3, 4].map((num) => (
                 <div key={num} className="flex flex-col items-center gap-2">
                   <div className={`w-12 h-12 rounded-full flex items-center justify-center font-black transition-all ${
@@ -386,9 +469,9 @@ setRegistrations(prev => [newReg, ...prev]);
               ))}
             </div>
 
-            <form onSubmit={handleSubmit} className="bg-white p-10 rounded-[2.5rem] shadow-2xl border border-slate-100">
+            <form onSubmit={handleSubmit} className="bg-white p-6 sm:p-10 rounded-[2.5rem] shadow-2xl border border-slate-100">
               {formStep === 1 && (
-                <div className="space-y-8 animate-in slide-in-from-left-4 duration-300">
+                <div className="space-y-8 animate-in slide-in-from-left-4 duration-300 max-w-4xl mx-auto">
                   <h2 className="text-2xl font-black text-slate-800 border-b pb-4 flex items-center gap-2">
                     <Trophy className="text-emerald-600" /> {t.step1}
                   </h2>
@@ -398,15 +481,8 @@ setRegistrations(prev => [newReg, ...prev]);
                       <input required type="text" value={formData.teamName} onChange={e => setFormData({...formData, teamName: e.target.value})} placeholder="Lohar Tigers" className="w-full px-5 py-4 rounded-2xl border border-slate-200 focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-600 transition-all outline-none bg-slate-50 font-bold" />
                     </div>
                     <div className="space-y-3">
-                      <label className="text-sm font-black text-slate-700 uppercase tracking-wider">{t.teamType}</label>
-                      <div className="flex gap-3 p-1.5 bg-slate-100 rounded-2xl">
-                        <button type="button" onClick={() => setFormData({...formData, teamType: 'jamaati'})} className={`flex-1 py-3 rounded-xl text-sm font-black transition-all ${formData.teamType === 'jamaati' ? 'bg-white text-emerald-600 shadow-sm ring-1 ring-emerald-100' : 'text-slate-500'}`}>
-                          {t.jamaati}
-                        </button>
-                        <button type="button" onClick={() => setFormData({...formData, teamType: 'non-jamaati'})} className={`flex-1 py-3 rounded-xl text-sm font-black transition-all ${formData.teamType === 'non-jamaati' ? 'bg-white text-emerald-600 shadow-sm ring-1 ring-emerald-100' : 'text-slate-500'}`}>
-                          {t.nonJamaati}
-                        </button>
-                      </div>
+                      <label className="text-sm font-black text-slate-700 uppercase tracking-wider">{t.jamatName}</label>
+                      <input required type="text" value={formData.jamatName} onChange={e => setFormData({...formData, jamatName: e.target.value})} placeholder="Jamat Name" className="w-full px-5 py-4 rounded-2xl border border-slate-200 focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-600 transition-all outline-none bg-slate-50 font-bold" />
                     </div>
                   </div>
                   <button type="button" onClick={() => setFormStep(2)} className="w-full bg-emerald-600 text-white font-black py-5 rounded-2xl mt-4 flex items-center justify-center gap-2 shadow-lg">
@@ -416,7 +492,7 @@ setRegistrations(prev => [newReg, ...prev]);
               )}
 
               {formStep === 2 && (
-                <div className="space-y-8 animate-in slide-in-from-left-4 duration-300">
+                <div className="space-y-8 animate-in slide-in-from-left-4 duration-300 max-w-4xl mx-auto">
                   <h2 className="text-2xl font-black text-slate-800 border-b pb-4 flex items-center gap-2">
                     <User className="text-emerald-600" /> {t.step2}
                   </h2>
@@ -426,24 +502,12 @@ setRegistrations(prev => [newReg, ...prev]);
                         <label className="text-sm font-black text-slate-700">{t.captainName}</label>
                         <input required type="text" value={formData.captainName} onChange={e => setFormData({...formData, captainName: e.target.value})} className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-slate-50 font-bold" />
                       </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-black text-slate-700">{t.captainContact}</label>
-                        <input required type="tel" value={formData.captainContact} onChange={e => setFormData({...formData, captainContact: e.target.value})} placeholder="03xx-xxxxxxx" className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-slate-50 font-bold" />
-                      </div>
                     </div>
                     <div className="space-y-6">
                       <div className="space-y-2">
                         <label className="text-sm font-black text-slate-700">{t.viceCaptainName}</label>
                         <input required type="text" value={formData.viceCaptainName} onChange={e => setFormData({...formData, viceCaptainName: e.target.value})} className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-slate-50 font-bold" />
                       </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-black text-slate-700">{t.viceCaptainContact}</label>
-                        <input required type="tel" value={formData.viceCaptainContact} onChange={e => setFormData({...formData, viceCaptainContact: e.target.value})} placeholder="03xx-xxxxxxx" className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-slate-50 font-bold" />
-                      </div>
-                    </div>
-                    <div className="md:col-span-2 space-y-2">
-                      <label className="text-sm font-black text-slate-700">{t.alternativeContact}</label>
-                      <input required type="tel" value={formData.alternativeContact} onChange={e => setFormData({...formData, alternativeContact: e.target.value})} placeholder="Emergency Phone" className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-slate-50 font-bold" />
                     </div>
                   </div>
                   <div className="flex gap-4">
@@ -454,19 +518,54 @@ setRegistrations(prev => [newReg, ...prev]);
               )}
 
               {formStep === 3 && (
-                <div className="space-y-8 animate-in slide-in-from-left-4 duration-300">
+                <div className="space-y-8 animate-in slide-in-from-left-4 duration-300 w-full overflow-hidden">
                   <h2 className="text-2xl font-black text-slate-800 border-b pb-4 flex items-center gap-2">
                     <Users className="text-emerald-600" /> {t.step3}
                   </h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {formData.players.map((p) => (
-                      <div key={p.id} className="relative group">
-                        <div className={`absolute top-1/2 -translate-y-1/2 px-4 text-emerald-600/30 font-black italic text-lg ${isRTL ? 'right-0' : 'left-0'}`}>{p.id}</div>
-                        <input required type="text" value={p.name} onChange={e => handlePlayerChange(p.id, e.target.value)} placeholder={`${t.player} ${p.id}`} className={`w-full py-4 rounded-2xl border border-slate-200 bg-slate-50 font-bold ${isRTL ? 'pr-12 pl-4' : 'pl-12 pr-4'}`} />
-                      </div>
-                    ))}
+                  
+                  <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-2xl flex items-start gap-3 shadow-sm">
+                    <Info className="text-blue-500 shrink-0 mt-1" size={20} />
+                    <p className="text-sm font-bold text-blue-900 leading-relaxed">
+                      {t.squadNotice}
+                    </p>
                   </div>
-                  <div className="flex gap-4">
+
+                  <div className="overflow-x-auto pb-4 custom-scrollbar">
+                    <div className="min-w-[800px] space-y-3">
+                      <div className="grid grid-cols-[40px_2fr_1fr_1.5fr_1.5fr_1.5fr] gap-3 px-4 py-2 bg-slate-50 rounded-xl text-[10px] font-black uppercase tracking-wider text-slate-400">
+                        <div>#</div>
+                        <div>{t.colName}</div>
+                        <div>{t.colAge}</div>
+                        <div>{t.colPhone}</div>
+                        <div>{t.colCNIC}</div>
+                        <div className="text-center">{t.colImage}</div>
+                      </div>
+
+                      {formData.players.map((p) => (
+                        <div key={p.id} className="grid grid-cols-[40px_2fr_1fr_1.5fr_1.5fr_1.5fr] gap-3 items-center bg-white border border-slate-100 p-2 rounded-2xl hover:shadow-md transition-shadow group">
+                          <div className="text-sm font-black text-emerald-600/40 text-center italic">{p.id}</div>
+                          
+                          <input required type="text" value={p.name} onChange={e => handlePlayerChange(p.id, 'name', e.target.value)} placeholder={t.colName} className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none" />
+                          
+                          <input required type="number" value={p.age} onChange={e => handlePlayerChange(p.id, 'age', e.target.value)} placeholder={t.colAge} className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none" />
+                          
+                          <input required type="tel" value={p.phone} onChange={e => handlePlayerChange(p.id, 'phone', e.target.value)} placeholder="03xx-xxxxxxx" className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none" />
+                          
+                          <input required type="text" value={p.cnic} onChange={e => handlePlayerChange(p.id, 'cnic', e.target.value)} placeholder="xxxxx-xxxxxxx-x" className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none" />
+                          
+                          <div className="flex justify-center">
+                            <label className={`cursor-pointer px-4 py-3 rounded-xl transition-all flex items-center justify-center gap-2 text-sm font-black w-full ${p.cnicImage ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}>
+                              {p.cnicImage ? <CheckCircle2 size={18} /> : <Camera size={18} />}
+                              {p.cnicImage ? 'Uploaded' : 'Upload'}
+                              <input type="file" accept="image/*" onChange={e => handleImageUpload(p.id, e)} className="hidden" />
+                            </label>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4 max-w-4xl mx-auto">
                     <button type="button" onClick={() => setFormStep(2)} className="flex-1 border border-slate-200 font-black py-4 rounded-2xl">{t.back}</button>
                     <button type="button" onClick={() => setFormStep(4)} className="flex-[2] bg-emerald-600 text-white font-black py-4 rounded-2xl shadow-lg">{t.next}</button>
                   </div>
@@ -474,11 +573,21 @@ setRegistrations(prev => [newReg, ...prev]);
               )}
 
               {formStep === 4 && (
-                <div className="space-y-8 animate-in slide-in-from-left-4 duration-300">
+                <div className="space-y-8 animate-in slide-in-from-left-4 duration-300 max-w-4xl mx-auto">
                   <h2 className="text-2xl font-black text-slate-800 border-b pb-4 flex items-center gap-2">
                     <CreditCard className="text-emerald-600" /> {t.step4}
                   </h2>
                   
+                  <div className="bg-red-50 border border-red-200 rounded-[2rem] p-6 flex flex-col sm:flex-row items-center gap-4 shadow-sm animate-pulse-subtle">
+                    <div className="bg-red-600 p-3 rounded-2xl text-white">
+                      <CalendarClock size={28} />
+                    </div>
+                    <div className="text-center sm:text-left">
+                      <p className="text-red-900 font-black text-lg">{t.paymentDeadlineLabel}</p>
+                      <p className="text-red-600 font-black text-2xl tracking-tight">{t.paymentDeadlineDate}</p>
+                    </div>
+                  </div>
+
                   <div className="bg-emerald-50 border border-emerald-100 rounded-[2rem] p-8 space-y-6">
                     <div className="flex items-center gap-4">
                       <div className="bg-emerald-600 p-3 rounded-2xl text-white">
@@ -490,32 +599,19 @@ setRegistrations(prev => [newReg, ...prev]);
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-4">
-                      <div className="bg-white p-5 rounded-2xl border border-emerald-200 shadow-sm flex justify-between items-center group">
-                        <div className="space-y-1">
-                          <p className="text-[10px] text-slate-400 font-black uppercase tracking-wider">{t.accountNumber}</p>
-                          <p className="text-xl font-black text-slate-800 tracking-tight">{EASY_PAISA_NUMBER}</p>
-                        </div>
-                        <button type="button" onClick={() => copyToClipboard(EASY_PAISA_NUMBER)} className="p-3 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all">
-                          <Copy size={20} />
-                        </button>
+                    <div className="bg-white p-8 rounded-[2rem] border-2 border-dashed border-emerald-200 flex flex-col items-center justify-center text-center space-y-4">
+                      <div className="bg-emerald-50 p-4 rounded-full">
+                        <ShieldCheck className="text-emerald-600" size={32} />
                       </div>
-
-                      <div className="bg-white p-5 rounded-2xl border border-emerald-200 shadow-sm flex justify-between items-center">
-                        <div className="space-y-1">
-                          <p className="text-[10px] text-slate-400 font-black uppercase tracking-wider">{t.accountName}</p>
-                          <p className="text-xl font-black text-slate-800 tracking-tight">{EASY_PAISA_NAME}</p>
-                        </div>
-                        <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
-                          <User size={20} />
-                        </div>
-                      </div>
+                      <p className="text-lg font-black text-emerald-900 leading-tight italic">
+                        "{t.paymentInstruction}"
+                      </p>
                     </div>
                   </div>
 
                   <div className="mt-8 p-6 bg-slate-50 rounded-2xl flex items-start gap-4 border border-slate-200">
                     <input id="agree" required type="checkbox" checked={formData.agreedToTerms} onChange={e => setFormData({...formData, agreedToTerms: e.target.checked})} className="mt-1 w-6 h-6 text-emerald-600 rounded-lg border-slate-300 focus:ring-emerald-500 cursor-pointer" />
-                    <label htmlFor="agree" className="text-sm text-slate-700 cursor-pointer font-bold leading-relaxed">{lang === 'ur' ? 'میں تصدیق کرتا ہوں کہ تمام معلومات درست ہیں اور میں فیس کی ادائیگی کا پابند ہوں۔' : 'I confirm all info is correct and I am bound to pay the entry fee.'}</label>
+                    <label htmlFor="agree" className="text-sm text-slate-700 cursor-pointer font-bold leading-relaxed">{lang === 'ur' ? 'میں تصدیق کرتا ہوں کہ تمام معلومات درست ہیں اور میں ٹورنامنٹ کے تمام قوانین پر عمل درآمد کا پابند ہوں۔' : 'I confirm all info is correct and I am bound to follow all tournament rules and regulations.'}</label>
                   </div>
 
                   <div className="flex gap-4">
@@ -530,73 +626,165 @@ setRegistrations(prev => [newReg, ...prev]);
           </div>
         )}
 
-        {step === 'success' && (
-          <div className="max-w-2xl mx-auto py-12 animate-in zoom-in-95 duration-700 text-center">
-            {/* Wrapper for isolated print output */}
-            <div id="printable-ticket-wrapper">
-              {/* The Digital Pass Card */}
-              <div id="printable-ticket" className="relative mb-12 transform hover:rotate-1 transition-transform cursor-pointer">
-                <div className="absolute -inset-4 bg-gradient-to-r from-emerald-500 to-teal-500 blur-2xl opacity-20 no-print"></div>
-                <div className="relative bg-white rounded-[3rem] shadow-[0_35px_60px_-15px_rgba(0,0,0,0.1)] overflow-hidden border-4 border-white">
-                  <div className="bg-emerald-700 text-white p-8 space-y-2 relative">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16"></div>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h4 className="text-xs font-black uppercase tracking-[0.2em] opacity-70">Official Entry Pass</h4>
-                        <h3 className="text-3xl font-black">{registrations[0]?.teamName}</h3>
-                      </div>
-                      <div className="bg-white/10 p-2 rounded-xl backdrop-blur-md">
-                        <Trophy size={32} />
-                      </div>
+        {step === 'success' && lastSubmittedData && (
+          <div className="max-w-4xl mx-auto py-12 animate-in zoom-in-95 duration-700 text-center space-y-12">
+            <div className="space-y-4">
+              <h2 className="text-4xl font-black text-slate-900">{t.successTitle}</h2>
+              <p className="text-slate-600 text-lg leading-relaxed font-medium max-w-2xl mx-auto">
+                {t.successMsg}
+              </p>
+            </div>
+
+            <div id="printable-ticket-wrapper" className="flex justify-center">
+              <div id="printable-ticket" className="bg-white shadow-2xl border-4 border-slate-100 rounded-lg overflow-hidden w-full max-w-[800px] min-h-[1100px] flex flex-col text-left" dir={isRTL ? 'rtl' : 'ltr'}>
+                <div className="bg-emerald-900 text-white p-10 flex justify-between items-center border-b-8 border-emerald-500">
+                  <div className="space-y-2">
+                    <div className="bg-white/10 px-4 py-1 rounded-full inline-block backdrop-blur-md">
+                      <p className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-200">Official Document</p>
                     </div>
+                    <h1 className="text-4xl font-black tracking-tight">{t.registrationFormTitle}</h1>
+                    <p className="text-emerald-400 font-bold opacity-80 uppercase tracking-widest">{t.title} - Youth Cup</p>
                   </div>
-                  <div className="p-8 grid grid-cols-2 gap-8 text-left border-b-2 border-dashed border-slate-100">
-                    <div className="space-y-1">
-                      <p className="text-[10px] text-slate-400 font-black uppercase">Category</p>
-                      <p className="text-sm font-black text-slate-800">{registrations[0]?.teamType.toUpperCase()}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-[10px] text-slate-400 font-black uppercase">Registration ID</p>
-                      <p className="text-sm font-black text-emerald-600">{registrations[0]?.regId}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-[10px] text-slate-400 font-black uppercase">Captain</p>
-                      <p className="text-sm font-black text-slate-800">{registrations[0]?.captainName}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-[10px] text-slate-400 font-black uppercase">Date Registered</p>
-                      <p className="text-sm font-black text-slate-800">{new Date().toLocaleDateString()}</p>
-                    </div>
+                  <div className="bg-white p-4 rounded-3xl shadow-lg">
+                    <Trophy size={60} className="text-emerald-700" />
                   </div>
-                  <div className="p-6 bg-emerald-50 flex items-center gap-4 text-left">
-                    <div className="bg-emerald-600 p-2 rounded-lg text-white"><CreditCard size={18} /></div>
+                </div>
+
+                <div className="p-12 space-y-12 flex-1">
+                  <div className="grid grid-cols-2 gap-8 bg-slate-50 p-6 rounded-3xl border border-slate-100">
                     <div>
-                      <p className="text-[10px] text-emerald-600 font-black uppercase">Payment Status</p>
-                      <p className="text-xs font-bold text-slate-700">Pending Verification (EasyPaisa)</p>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Registration Number</p>
+                      <p className="text-2xl font-black text-emerald-700">{lastSubmittedData.regId}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Date Issued</p>
+                      <p className="text-lg font-black text-slate-800">{new Date(lastSubmittedData.timestamp).toLocaleDateString()}</p>
                     </div>
                   </div>
-                  <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
-                    <div className="flex gap-1">
-                      {[1, 2, 3, 4, 5, 6, 7, 8].map(i => <div key={i} className="w-1 h-8 bg-slate-200 rounded-full"></div>)}
+
+                  <div className="grid grid-cols-2 gap-12">
+                    <div className="space-y-6">
+                      <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{t.teamName}</p>
+                        <p className="text-2xl font-black text-slate-900 border-b-2 border-emerald-100 pb-2">{lastSubmittedData.teamName}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{t.jamatName}</p>
+                        <p className="text-xl font-bold text-slate-700">{lastSubmittedData.jamatName}</p>
+                      </div>
                     </div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Lohar Wadha Youth Cup 2026</p>
+                    <div className="space-y-6">
+                      <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{t.captainName}</p>
+                        <p className="text-xl font-black text-slate-900 border-b-2 border-emerald-100 pb-2">{lastSubmittedData.captainName}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{t.viceCaptainName}</p>
+                        <p className="text-lg font-bold text-slate-700">{lastSubmittedData.viceCaptainName}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2">
+                      <Users size={20} className="text-emerald-600" /> {t.step3}
+                    </h3>
+                    <div className="border border-slate-200 rounded-2xl overflow-hidden">
+                      <table className="w-full text-sm border-collapse">
+                        <thead className="bg-slate-50 border-b border-slate-200">
+                          <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                            <th className="px-4 py-3 text-center w-10">#</th>
+                            <th className="px-4 py-3 text-left">{t.colName}</th>
+                            <th className="px-4 py-3 text-center">{t.colAge}</th>
+                            <th className="px-4 py-3 text-left">{t.colPhone}</th>
+                            <th className="px-4 py-3 text-left">{t.colCNIC}</th>
+                            <th className="px-4 py-3 text-center">Docs</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {lastSubmittedData.players.map((p, idx) => (
+                            <tr key={idx} className="hover:bg-slate-50/50">
+                              <td className="px-4 py-3 text-center text-slate-400 font-bold">{p.id}</td>
+                              <td className="px-4 py-3 font-black text-slate-800">{p.name || '-'}</td>
+                              <td className="px-4 py-3 text-center font-bold text-slate-600">{p.age || '-'}</td>
+                              <td className="px-4 py-3 text-slate-700 font-medium">{p.phone || '-'}</td>
+                              <td className="px-4 py-3 text-slate-700 font-mono text-xs">{p.cnic || '-'}</td>
+                              <td className="px-4 py-3 text-center">
+                                {p.cnicImage ? (
+                                  <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full text-[10px] font-black">
+                                    <CheckCircle2 size={10} /> {lang === 'ur' ? 'اپ لوڈ' : 'Verified'}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-300">-</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="bg-amber-50 p-8 rounded-[2rem] border border-amber-100 space-y-6">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-amber-500 p-2 rounded-xl text-white">
+                        <CreditCard size={20} />
+                      </div>
+                      <h4 className="font-black text-amber-900">{t.paymentHeading}</h4>
+                    </div>
+                    
+                    <div className="bg-white p-6 rounded-[1.5rem] border border-amber-200 flex flex-col items-center justify-center text-center space-y-2">
+                       <p className="text-base font-black text-amber-900 italic">
+                        "{t.paymentInstruction}"
+                       </p>
+                      <div className="text-[10px] font-black text-amber-600 uppercase tracking-widest">
+                        {t.paymentDeadlineLabel}: {t.paymentDeadlineDate}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 p-10 border-t border-slate-200 flex justify-between items-center mt-auto">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Organized By</p>
+                    <p className="text-sm font-black text-slate-800">Lohar Wadha Committee</p>
+                  </div>
+                  <div className="flex gap-2">
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map(i => <div key={i} className="w-1.5 h-12 bg-slate-200 rounded-full"></div>)}
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Security Stamp</p>
+                    <div className="w-16 h-16 border-4 border-emerald-600/20 rounded-full flex items-center justify-center text-emerald-600/20 font-black text-[8px] rotate-12">
+                      OFFICIAL
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-
-            <h2 className="text-4xl font-black text-slate-900 mb-6">{t.successTitle}</h2>
-            <p className="text-slate-600 mb-10 text-lg leading-relaxed font-medium">
-              {t.successMsg}
-            </p>
             
-            <div className="flex flex-col sm:flex-row gap-4 justify-center no-print">
-              <button onClick={() => window.print()} className="bg-white border-2 border-slate-200 px-8 py-4 rounded-2xl font-black flex items-center justify-center gap-2 hover:bg-slate-50 transition-all">
-                <ImageIcon size={20} /> Screenshot / Save
+            <div className="flex flex-col sm:flex-row gap-6 justify-center no-print">
+              <button 
+                onClick={() => { resetForm(); setStep('welcome'); }} 
+                className="bg-white border-2 border-slate-200 px-10 py-5 rounded-3xl font-black flex items-center justify-center gap-3 hover:bg-slate-50 transition-all text-xl"
+              >
+                {t.returnHome}
               </button>
-              <button onClick={() => { resetForm(); setStep('welcome'); }} className="bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black flex items-center justify-center gap-2 shadow-xl hover:shadow-emerald-200/50 transition-all">
-                {lang === 'ur' ? 'ہوم پیج پر جائیں' : 'Return Home'}
-              </button>
+            </div>
+
+            <div className="space-y-8 pt-10 no-print animate-in fade-in slide-in-from-bottom-4 duration-1000">
+              <div className="inline-block bg-emerald-50 px-8 py-5 rounded-[2rem] border border-emerald-100 shadow-sm">
+                <p className="text-emerald-900 font-black text-xl md:text-2xl leading-relaxed italic">
+                  {t.thankYouNote}
+                </p>
+              </div>
+              <div className="space-y-3">
+                <h4 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
+                  {t.orgName}
+                </h4>
+                <p className="text-emerald-600 font-bold text-xl md:text-2xl">
+                  {t.orgMotto}
+                </p>
+              </div>
             </div>
           </div>
         )}
@@ -620,45 +808,34 @@ setRegistrations(prev => [newReg, ...prev]);
               </div>
             </div>
 
-            {/* Admin Stats & Filters */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
               <div className="bg-emerald-600 p-8 rounded-[2rem] shadow-xl text-white">
                 <p className="text-emerald-100 text-sm font-black uppercase tracking-widest mb-1">{t.totalTeams}</p>
                 <p className="text-5xl font-black">{registrations.length}</p>
-              </div>
-              <div className="bg-white p-8 rounded-[2rem] shadow-lg border border-slate-100 flex flex-col justify-center">
-                <p className="text-slate-400 text-sm font-black uppercase tracking-widest mb-2">{t.teamType}</p>
-                <div className="flex gap-4">
-                  <button onClick={() => setFilterType('all')} className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${filterType === 'all' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-50 text-slate-500'}`}>All</button>
-                  <button onClick={() => setFilterType('jamaati')} className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${filterType === 'jamaati' ? 'bg-blue-100 text-blue-700' : 'bg-slate-50 text-slate-500'}`}>Jamaati</button>
-                  <button onClick={() => setFilterType('non-jamaati')} className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${filterType === 'non-jamaati' ? 'bg-orange-100 text-orange-700' : 'bg-slate-50 text-slate-500'}`}>Non-Jamaati</button>
-                </div>
               </div>
               <div className="bg-white p-8 rounded-[2rem] shadow-lg border border-slate-100 relative overflow-hidden group">
                 <Search className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-100 w-24 h-24 -mr-8 group-focus-within:text-emerald-50 transition-colors" />
                 <div className="relative z-10 space-y-2">
                   <label className="text-slate-400 text-sm font-black uppercase tracking-widest">{t.search}</label>
-                  <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Name / ID / Phone" className="w-full bg-transparent font-bold outline-none text-slate-800" />
+                  <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Name / Jamat / ID" className="w-full bg-transparent font-bold outline-none text-slate-800" />
                 </div>
               </div>
             </div>
 
-            {/* Management Table */}
             <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left" dir="ltr">
                   <thead className="bg-slate-50/50 border-b border-slate-100">
                     <tr>
                       <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Team / Pass</th>
-                      <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Captain Info</th>
-                      <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Category</th>
-                      <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Contacts</th>
+                      <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Jamat Info</th>
+                      <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Leadership</th>
                       <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
                     {filteredRegistrations.length === 0 ? (
-                      <tr><td colSpan={5} className="px-8 py-20 text-center text-slate-400 font-bold">{t.noData}</td></tr>
+                      <tr><td colSpan={4} className="px-8 py-20 text-center text-slate-400 font-bold">{t.noData}</td></tr>
                     ) : (
                       filteredRegistrations.map((reg) => (
                         <tr key={reg.regId} className="hover:bg-slate-50/30 transition-colors group">
@@ -668,22 +845,17 @@ setRegistrations(prev => [newReg, ...prev]);
                             <div className="text-[10px] text-slate-400 font-bold">{new Date(reg.timestamp).toLocaleString()}</div>
                           </td>
                           <td className="px-8 py-6">
-                            <div className="text-sm font-bold text-slate-800">{reg.captainName}</div>
-                            <div className="text-xs text-slate-500 font-medium">{reg.captainContact}</div>
+                            <div className="text-sm font-bold text-slate-800">{reg.jamatName}</div>
                           </td>
                           <td className="px-8 py-6">
-                            <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                              reg.teamType === 'jamaati' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'
-                            }`}>{reg.teamType}</span>
-                          </td>
-                          <td className="px-8 py-6">
-                            <div className="text-[10px] text-slate-600 font-bold">V: {reg.viceCaptainContact}</div>
-                            <div className="text-[10px] text-slate-400">A: {reg.alternativeContact}</div>
+                            <div className="text-xs font-bold text-slate-800">C: {reg.captainName}</div>
+                            <div className="text-xs text-slate-500 font-medium">VC: {reg.viceCaptainName}</div>
                           </td>
                           <td className="px-8 py-6">
                             <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button onClick={() => startEdit(reg)} className="p-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all"><Edit2 size={18} /></button>
-                              <button onClick={() => deleteRegistration(reg.regId)} className="p-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-red-600 hover:text-white transition-all"><Trash2 size={18} /></button>
+                              <button onClick={() => setViewingReg(reg)} title="View Details" className="p-3 bg-white border border-slate-100 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm"><Eye size={18} /></button>
+                              <button onClick={() => startEdit(reg)} title="Edit" className="p-3 bg-white border border-slate-100 text-slate-600 rounded-xl hover:bg-slate-600 hover:text-white transition-all shadow-sm"><Edit2 size={18} /></button>
+                              <button onClick={() => deleteRegistration(reg.regId)} title="Delete" className="p-3 bg-white border border-slate-100 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-sm"><Trash2 size={18} /></button>
                             </div>
                           </td>
                         </tr>
@@ -697,7 +869,120 @@ setRegistrations(prev => [newReg, ...prev]);
         )}
       </main>
 
-      {/* Login Modal */}
+      {/* Admin Detail View Modal */}
+      {viewingReg && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 sm:p-8 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-5xl h-full max-h-[90vh] rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden border border-slate-100">
+            <div className="bg-emerald-900 p-8 text-white flex justify-between items-center border-b-8 border-emerald-500 shrink-0">
+              <div className="flex items-center gap-4">
+                <div className="bg-white p-3 rounded-2xl">
+                  <Trophy size={32} className="text-emerald-700" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-emerald-300">Team Details</p>
+                  <h3 className="text-2xl font-black tracking-tight">{viewingReg.teamName}</h3>
+                </div>
+              </div>
+              <button onClick={() => setViewingReg(null)} className="p-3 bg-white/10 hover:bg-white/20 rounded-2xl transition-all">
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-8 sm:p-12 space-y-12">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                <div className="space-y-6">
+                  <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Jamat Info</p>
+                    <p className="text-xl font-bold text-slate-900">{viewingReg.jamatName}</p>
+                  </div>
+                  <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Registration ID</p>
+                    <p className="text-xl font-black text-emerald-700">{viewingReg.regId}</p>
+                    <p className="text-[10px] text-slate-400 font-medium">{new Date(viewingReg.timestamp).toLocaleString()}</p>
+                  </div>
+                </div>
+                <div className="space-y-6">
+                  <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 flex justify-between items-center">
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Captain</p>
+                      <p className="text-lg font-black text-slate-900">{viewingReg.captainName}</p>
+                    </div>
+                  </div>
+                  <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Vice Captain</p>
+                    <p className="text-lg font-black text-slate-900">{viewingReg.viceCaptainName}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-xl font-black text-slate-800 mb-6 flex items-center gap-2">
+                  <Users size={24} className="text-emerald-600" /> Team Squad & Documentation
+                </h4>
+                <div className="grid grid-cols-1 gap-4">
+                  {viewingReg.players.map((p) => (
+                    <div key={p.id} className="bg-white border border-slate-100 p-6 rounded-[2rem] flex flex-col md:flex-row md:items-center justify-between gap-6 hover:shadow-lg transition-all group">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center font-black text-slate-400 italic">
+                          {p.id}
+                        </div>
+                        <div>
+                          <p className="font-black text-slate-900 text-lg">{p.name || "N/A"}</p>
+                          <p className="text-xs text-slate-500 font-bold">Age: {p.age || "N/A"} • Phone: {p.phone || "N/A"}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                        <div className="px-4 py-2 bg-slate-50 rounded-xl border border-slate-100">
+                          <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">CNIC/B-Form</p>
+                          <p className="text-sm font-mono font-bold text-slate-700">{p.cnic || "Not Provided"}</p>
+                        </div>
+                        
+                        {p.cnicImage ? (
+                          <button 
+                            onClick={() => setSelectedImage(p.cnicImage!)}
+                            className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-5 py-3 rounded-2xl font-black text-sm hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
+                          >
+                            <ImageIcon size={18} />
+                            View Document
+                            <Maximize2 size={14} className="opacity-50" />
+                          </button>
+                        ) : (
+                          <div className="flex items-center gap-2 text-slate-300 px-5 py-3 rounded-2xl font-black text-sm italic">
+                            No Picture Uploaded
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-8 bg-slate-50 border-t border-slate-200 flex justify-between items-center shrink-0">
+               <button onClick={() => deleteRegistration(viewingReg.regId)} className="flex items-center gap-2 text-red-600 font-black hover:bg-red-50 px-6 py-3 rounded-xl transition-all">
+                <Trash2 size={20} /> Remove Entry
+               </button>
+               <button onClick={() => setViewingReg(null)} className="bg-slate-900 text-white px-10 py-4 rounded-2xl font-black shadow-xl hover:bg-slate-800 transition-all">
+                Close Viewer
+               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox for Admin Image Viewing */}
+      {selectedImage && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-xl animate-in zoom-in-95 duration-300" onClick={() => setSelectedImage(null)}>
+          <button className="absolute top-10 right-10 text-white bg-white/10 p-4 rounded-full hover:bg-white/20 transition-all">
+            <X size={40} />
+          </button>
+          <div className="max-w-full max-h-[90vh] rounded-[2.5rem] overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.5)] border-4 border-white/20" onClick={e => e.stopPropagation()}>
+            <img src={selectedImage} alt="CNIC Document" className="max-w-full max-h-[85vh] object-contain" />
+          </div>
+        </div>
+      )}
+
       {isLoginModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
           <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-100">
@@ -722,44 +1007,6 @@ setRegistrations(prev => [newReg, ...prev]);
         </div>
       )}
 
-      {/* AI Bot */}
-      <div id="chat-bot-container" className="fixed bottom-8 right-8 z-[60]" dir="ltr">
-        {!isChatOpen ? (
-          <button onClick={() => setIsChatOpen(true)} className="w-16 h-16 bg-emerald-600 text-white rounded-2xl shadow-[0_20px_50px_rgba(5,150,105,0.4)] flex items-center justify-center hover:scale-110 active:scale-95 transition-all group">
-            <MessageSquare size={28} />
-          </button>
-        ) : (
-          <div className="w-[90vw] sm:w-[420px] h-[600px] bg-white rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden border border-slate-100 animate-in slide-in-from-bottom-6 duration-500">
-            <div className="bg-emerald-600 p-6 text-white flex justify-between items-center shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="bg-white/20 p-2 rounded-xl backdrop-blur-sm"><ShieldCheck size={24} /></div>
-                <span className="font-black text-lg">{t.chatTitle}</span>
-              </div>
-              <button onClick={() => setIsChatOpen(false)} className="hover:bg-emerald-500 p-2 rounded-xl"><X size={24} /></button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50">
-              {messages.length === 0 && (
-                <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
-                  <p className="text-sm text-slate-600 font-bold italic leading-relaxed">Assalam-o-Alaikum! I'm your AI Tournament Guide. You can ask me about entry fees, match overs, or rules in Urdu or English.</p>
-                </div>
-              )}
-              {messages.map((m, i) => (
-                <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[85%] p-4 rounded-3xl text-sm font-bold leading-relaxed ${
-                    m.role === 'user' ? 'bg-emerald-600 text-white rounded-br-none shadow-lg' : 'bg-white border border-slate-100 text-slate-800 rounded-bl-none shadow-sm'
-                  }`}>{m.text}</div>
-                </div>
-              ))}
-              {isThinking && <div className="flex gap-2 p-4 bg-white rounded-full w-20 shadow-sm"><div className="w-2 h-2 bg-emerald-300 rounded-full animate-bounce"></div><div className="w-2 h-2 bg-emerald-300 rounded-full animate-bounce [animation-delay:-0.15s]"></div><div className="w-2 h-2 bg-emerald-300 rounded-full animate-bounce [animation-delay:-0.3s]"></div></div>}
-            </div>
-            <div className="p-6 bg-white border-t border-slate-100 flex gap-3 shrink-0">
-              <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleChatSend()} placeholder="Ask a question..." className="flex-1 px-6 py-4 bg-slate-50 rounded-2xl focus:outline-none focus:ring-4 focus:ring-emerald-500/10 font-bold" />
-              <button onClick={handleChatSend} className="bg-emerald-600 text-white p-4 rounded-2xl hover:bg-emerald-700 transition-all shadow-lg"><Send size={24} /></button>
-            </div>
-          </div>
-        )}
-      </div>
-
       <footer className="py-20 bg-white border-t border-slate-100 mt-20 no-print">
         <div className="max-w-4xl mx-auto px-6 text-center space-y-12">
           <div className="space-y-2">
@@ -767,6 +1014,7 @@ setRegistrations(prev => [newReg, ...prev]);
             <p className="font-black text-slate-900 text-2xl">By Order of Committee</p>
             <p className="text-slate-400 font-bold uppercase tracking-widest text-sm">Lohar Wadha Youth Cup 2026</p>
           </div>
+          
           <div className="flex flex-col md:flex-row justify-between items-center gap-8 pt-10 border-t border-slate-50">
             <p className="text-xs text-slate-400 font-bold tracking-tighter">Created by Haris Lakhani</p>
             <button onClick={() => setIsLoginModalOpen(true)} className="flex items-center gap-2 text-xs font-black text-slate-400 hover:text-emerald-600 transition-all uppercase tracking-[0.3em] group">
