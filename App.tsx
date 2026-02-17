@@ -1,5 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { collection, addDoc, getDocs } from "firebase/firestore";
+import { db } from "./firebase";
 import { 
   Trophy, 
   Users, 
@@ -44,7 +46,6 @@ import { Language, RegistrationData, Player, Message } from './types';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 
-const STORAGE_KEY = 'loharwadha_registrations_v7';
 const RESTRICTIONS_KEY = 'loharwadha_restrictions_enabled';
 const ADMIN_PASSWORD = '@Youth#1123';
 const SUPER_ADMIN_PASSWORD = '@Haris00666600';
@@ -97,6 +98,25 @@ const App: React.FC = () => {
   const [restrictionsEnabled, setRestrictionsEnabled] = useState(true);
   
   const [editingRegId, setEditingRegId] = useState<string | null>(null);
+  useEffect(() => {
+  const fetchRegistrations = async () => {
+    try {
+      const snapshot = await getDocs(collection(db, "registrations"));
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setRegistrations(data as RegistrationData[]);
+    } catch (error) {
+      console.error("Error fetching registrations:", error);
+    }
+  };
+
+  if (adminAuth) {
+    fetchRegistrations();
+  }
+}, [adminAuth]);
+
   const [lastSubmittedData, setLastSubmittedData] = useState<RegistrationData | null>(null);
   const [viewingReg, setViewingReg] = useState<RegistrationData | null>(null);
   const [logoError, setLogoError] = useState(false);
@@ -120,29 +140,7 @@ const App: React.FC = () => {
   });
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        setRegistrations(JSON.parse(saved));
-      } catch (e) {
-        console.error("Failed to load registrations", e);
-      }
-    }
-
-    const savedRestrictions = localStorage.getItem(RESTRICTIONS_KEY);
-    if (savedRestrictions !== null) {
-      setRestrictionsEnabled(savedRestrictions === 'true');
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(registrations));
-  }, [registrations]);
-
-  useEffect(() => {
-    localStorage.setItem(RESTRICTIONS_KEY, String(restrictionsEnabled));
-  }, [restrictionsEnabled]);
-
+    
   const toggleLang = () => setLang(prev => prev === 'en' ? 'ur' : 'en');
 
   const formatPhone = (val: string) => {
