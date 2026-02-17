@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { collection, addDoc, getDocs } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "./firebase";
 import { 
   Trophy, 
@@ -211,8 +211,8 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
     if (!validateSquad()) return;
     if (editingRegId) {
       const updatedData: RegistrationData = { 
@@ -227,15 +227,15 @@ const App: React.FC = () => {
       setStep('success');
     } else {
       const newReg: RegistrationData = {
-        ...formData,
-        regId: `LW-${Math.floor(Math.random() * 90000) + 10000}`,
-        timestamp: new Date().toISOString()
-      };
-      setRegistrations(prev => [newReg, ...prev]);
-      setLastSubmittedData(newReg);
-      setStep('success');
-    }
-  };
+  ...formData,
+  regId: `LW-${Math.floor(Math.random() * 90000) + 10000}`,
+  timestamp: new Date().toISOString()
+};
+
+await addDoc(collection(db, "registrations"), {
+  ...newReg,
+  createdAt: serverTimestamp()
+});
 
   const handleAdminLogin = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
