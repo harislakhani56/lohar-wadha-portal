@@ -103,7 +103,7 @@ const App: React.FC = () => {
   const [viewingReg, setViewingReg] = useState<RegistrationData | null>(null);
   const [logoError, setLogoError] = useState(false);
 
-  const initialPlayers: Player[] = Array.from({ length: 11 }, (_, i) => ({ 
+  const initialPlayers: Player[] = Array.from({ length: 12 }, (_, i) => ({ 
     id: i + 1, 
     name: '', 
     age: '', 
@@ -304,7 +304,7 @@ useEffect(() => {
       for (let i = 1; i < lines.length; i++) {
         const row = lines[i].split(',');
         if (row.length < 4 || !row[0].trim()) continue;
-        const players: Player[] = Array.from({ length: 11 }, (_, idx) => {
+        const players: Player[] = Array.from({ length: 12 }, (_, idx) => {
           const baseOffset = 4 + (idx * 3);
           return {
             id: idx + 1,
