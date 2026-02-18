@@ -1,5 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { collection, addDoc, getDocs } from "firebase/firestore";
+import { db } from "./firebase";
 import { 
   Trophy, 
   Users, 
@@ -119,11 +121,18 @@ const App: React.FC = () => {
     agreedToTerms: false
   });
 
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        setRegistrations(JSON.parse(saved));
+useEffect(() => {
+  const fetchData = async () => {
+    const snapshot = await getDocs(collection(db, "registrations"));
+    const data = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as RegistrationData[];
+    setRegistrations(data);
+  };
+
+  fetchData();
+}, []);
       } catch (e) {
         console.error("Failed to load registrations", e);
       }
@@ -134,10 +143,6 @@ const App: React.FC = () => {
       setRestrictionsEnabled(savedRestrictions === 'true');
     }
   }, []);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(registrations));
-  }, [registrations]);
 
   useEffect(() => {
     localStorage.setItem(RESTRICTIONS_KEY, String(restrictionsEnabled));
@@ -213,26 +218,26 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validateSquad()) return;
+  const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!validateSquad()) return;
     if (editingRegId) {
       const updatedData: RegistrationData = { 
         ...formData, 
         regId: editingRegId, 
         timestamp: new Date().toISOString() 
       };
-      setRegistrations(prev => prev.map(reg => 
+      await addDoc(collection(db, "registrations"), newReg); 
         reg.regId === editingRegId ? updatedData : reg
       ));
       setLastSubmittedData(updatedData);
       setStep('success');
     } else {
       const newReg: RegistrationData = {
-        ...formData,
-        regId: `LW-${Math.floor(Math.random() * 90000) + 10000}`,
-        timestamp: new Date().toISOString()
-      };
+    ...formData,
+    regId: `LW-${Math.floor(Math.random() * 90000) + 10000}`,
+    timestamp: new Date().toISOString()
+  };
       setRegistrations(prev => [newReg, ...prev]);
       setLastSubmittedData(newReg);
       setStep('success');
