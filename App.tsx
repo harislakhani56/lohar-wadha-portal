@@ -128,20 +128,22 @@ useEffect(() => {
       const data = snapshot.docs.map(doc => ({
         ...doc.data()
       })) as RegistrationData[];
+
       setRegistrations(data);
+
     } catch (error) {
       console.error("Error loading data:", error);
     }
   };
 
   fetchData();
-}, []);
 
-    const savedRestrictions = localStorage.getItem(RESTRICTIONS_KEY);
-    if (savedRestrictions !== null) {
-      setRestrictionsEnabled(savedRestrictions === 'true');
-    }
-  }, []);
+  const savedRestrictions = localStorage.getItem(RESTRICTIONS_KEY);
+  if (savedRestrictions !== null) {
+    setRestrictionsEnabled(savedRestrictions === 'true');
+  }
+
+}, []);
 
   useEffect(() => {
     localStorage.setItem(RESTRICTIONS_KEY, String(restrictionsEnabled));
@@ -228,7 +230,9 @@ useEffect(() => {
       timestamp: new Date().toISOString()
     };
 
-    await addDoc(collection(db, "registrations"), newReg);
+    const docRef = await addDoc(collection(db, "registrations"), newReg);
+
+    setRegistrations(prev => [...prev, newReg]);  // 🔥 IMPORTANT
 
     setLastSubmittedData(newReg);
     setStep('success');
