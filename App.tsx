@@ -230,7 +230,9 @@ useEffect(() => {
       timestamp: new Date().toISOString()
     };
 
+    console.log("Submitting to Firebase:", newReg);
     const docRef = await addDoc(collection(db, "registrations"), newReg);
+    console.log("Saved successfully");
 
     setRegistrations(prev => [...prev, newReg]);  // 🔥 IMPORTANT
 
