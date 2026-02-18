@@ -123,20 +123,19 @@ const App: React.FC = () => {
 
 useEffect(() => {
   const fetchData = async () => {
-    const snapshot = await getDocs(collection(db, "registrations"));
-    const data = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })) as RegistrationData[];
-    setRegistrations(data);
+    try {
+      const snapshot = await getDocs(collection(db, "registrations"));
+      const data = snapshot.docs.map(doc => ({
+        ...doc.data()
+      })) as RegistrationData[];
+      setRegistrations(data);
+    } catch (error) {
+      console.error("Error loading data:", error);
+    }
   };
 
   fetchData();
 }, []);
-      } catch (e) {
-        console.error("Failed to load registrations", e);
-      }
-    }
 
     const savedRestrictions = localStorage.getItem(RESTRICTIONS_KEY);
     if (savedRestrictions !== null) {
@@ -221,28 +220,24 @@ useEffect(() => {
   const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
   if (!validateSquad()) return;
-    if (editingRegId) {
-      const updatedData: RegistrationData = { 
-        ...formData, 
-        regId: editingRegId, 
-        timestamp: new Date().toISOString() 
-      };
-      await addDoc(collection(db, "registrations"), newReg); 
-        reg.regId === editingRegId ? updatedData : reg
-      ));
-      setLastSubmittedData(updatedData);
-      setStep('success');
-    } else {
-      const newReg: RegistrationData = {
-    ...formData,
-    regId: `LW-${Math.floor(Math.random() * 90000) + 10000}`,
-    timestamp: new Date().toISOString()
-  };
-      setRegistrations(prev => [newReg, ...prev]);
-      setLastSubmittedData(newReg);
-      setStep('success');
-    }
-  };
+
+  try {
+    const newReg: RegistrationData = {
+      ...formData,
+      regId: `LW-${Math.floor(Math.random() * 90000) + 10000}`,
+      timestamp: new Date().toISOString()
+    };
+
+    await addDoc(collection(db, "registrations"), newReg);
+
+    setLastSubmittedData(newReg);
+    setStep('success');
+
+  } catch (error) {
+    console.error("Save error:", error);
+    alert("Failed to save data");
+  }
+};
 
   const handleAdminLogin = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -326,7 +321,6 @@ useEffect(() => {
         });
       }
       if (newEntries.length > 0) {
-        setRegistrations(prev => [...newEntries, ...prev]);
         alert(`${newEntries.length} teams imported successfully!`);
       }
     };
